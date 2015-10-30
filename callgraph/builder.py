@@ -7,6 +7,7 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
+from inspect import signature
 from operator import attrgetter
 
 from callgraph.nodes import Node, RootNode, make_node
@@ -28,7 +29,7 @@ class CallGraphBuilder(object):
         self.process(function, self.root)
         return self.root
 
-    def process(self, function, parent):
+    def process(self, function, parent, args=[], kwargs={}):
         # attach new node to parent list
         node = parent.attach(make_node(function))
         if not node: return
@@ -45,14 +46,27 @@ class CallGraphBuilder(object):
         # magic follows
         with self.printer as iprinter:
             # TODO(burlog): signature
+            self.init_variables(iprinter, function, args, kwargs, node)
+
             # TODO(burlog): decorators
             # TODO(burlog): closure
             for expr in node.ast.body:
                 lineno = node.lineno + expr.lineno
                 iprinter("+ line at {0}:{1}".format(node.filename, lineno))
                 iprinter("+", node.source_line(expr.lineno).strip())
-                for callee in expr.evaluate(iprinter, node):
-                    self.process(callee, node)
+                for callee, args, kwargs in expr.evaluate(iprinter, node):
+                    self.process(callee, node, args, kwargs)
+
+    def init_variables(self, printer, function, args, kwargs, node):
+        bound = signature(function).bind_partial(*args, **kwargs)
+        ## TODO(burlog): default args
+        #for param in sig.parameters.values():
+        #    if param.name not in bound.arguments
+        #         if param.default is not param.empty:
+        #             pass #ba.arguments[param.name] = param.default
+        for name, value in bound.arguments.items():
+            printer("- Binding argument:", name + "=" + str(value))
+            node.replace_variable(name, value, node.lineno)
 
 if __name__ == "__main__":
     builder = CallGraphBuilder()

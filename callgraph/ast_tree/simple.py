@@ -27,37 +27,37 @@ class Nonlocal(Node):
     pass
 
 class NameConstantNode(Node):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
         self.value = expr_tree.value
 
 class StrNode(Node):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
         self.value = expr_tree.s
 
     def var_types(self, printer, ctx):
         yield str
 
 class BytesNode(Node):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
         self.value = expr_tree.s
 
     def var_types(self, printer, ctx):
         yield bytes
 
 class NumNode(Node):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
         self.value = expr_tree.n
 
     def var_types(self, printer, ctx):
         yield int
 
 class TupleNode(Node):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
         self.values = self.make_nodes(expr_tree.elts)
 
     def eval_node(self, printer, ctx):
@@ -75,14 +75,50 @@ class TupleNode(Node):
         yield tuple
 
 class ListNode(TupleNode):
-    def __init__(self, expr_tree):
-        super().__init__(expr_tree)
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
 
     def var_types(self, printer, ctx):
         yield list
 
-# TODO(burlog):
-#          | Dict(expr* keys, expr* values)
-#          | Set(expr* elts)
-#          | Ellipsis
+class SetNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.values = self.make_nodes(expr_tree.elts)
 
+    def eval_node(self, printer, ctx):
+        for value in self.values:
+            yield from value.evaluate(printer, ctx)
+
+    def var_types(self, printer, ctx):
+        yield set
+
+class DictNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.keys = self.make_nodes(expr_tree.keys)
+        self.values = self.make_nodes(expr_tree.values)
+
+    def eval_node(self, printer, ctx):
+        for key, value in zip(self.keys, self.values):
+            yield from key.evaluate(printer, ctx)
+            yield from value.evaluate(printer, ctx)
+
+    def var_types(self, printer, ctx):
+        yield dict
+
+class EllipsisNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+
+    def var_types(self, printer, ctx):
+        yield Ellipsis
+
+class KeywordNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.arg = expr_tree.arg
+        self.value = self.make_node(expr_tree.value)
+
+    def eval_node(self, printer, ctx):
+        yield from self.value.evaluate(printer, ctx)

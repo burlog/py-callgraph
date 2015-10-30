@@ -7,7 +7,7 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
-import ast, re
+import ast, re, builtins
 from types import FunctionType
 from inspect import isfunction, isclass, iscode
 
@@ -45,6 +45,12 @@ def scan_const(function, name):
             eval(obj, function.__globals__.copy(), class_dict)
             return type(name, (), class_dict)
 
-def find_object(f, name):
-    return scan_globals(f, name) or scan_closure(f, name) or scan_const(f, name)
+def scan_builins(function, name):
+    return builtins.__dict__.get(name, None)
+
+def find_object(function, name):
+    return scan_globals(function, name)\
+        or scan_closure(function, name)\
+        or scan_const(function, name)\
+        or scan_builins(function, name)
 

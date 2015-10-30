@@ -15,7 +15,7 @@ from tests.helpers import dfs_node_names
 
 def test_func_body():
     def fun1():
-        if False: return None
+        False
 
     def fun2():
         fun1()

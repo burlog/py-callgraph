@@ -22,7 +22,7 @@ def strip_indent(lines):
 def skip_leader(lines):
     leader = 0
     for line in lines:
-        if line and line[0] in " \t": break
+        if line and line[0] in " \t\r\n": break
         leader += 1
     return leader
 
@@ -32,7 +32,7 @@ def getsource(code):
     lines = list(strip_indent(lines[code.co_firstlineno - 1:]))
     leader = skip_leader(lines)
     for i, line in enumerate(islice(lines, leader, None)):
-        if line and line[0] not in " \t":
+        if line and line[0] not in " \t\r\n":
             return "".join(lines[:i + leader])
     return "".join(lines)
 

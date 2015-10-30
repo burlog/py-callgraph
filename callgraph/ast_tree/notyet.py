@@ -1,18 +1,18 @@
-#           | Return(expr? value)
+#          | Return(expr? value)
 #          | Yield(expr? value)
 #          | YieldFrom(expr value)
 #
-#           | Delete(expr* targets)
-#           | Assign(expr* targets, expr value)
-#           | AugAssign(expr target, operator op, expr value)
+#          | Delete(expr* targets)
+#          | Assign(expr* targets, expr value)
+#          | AugAssign(expr target, operator op, expr value)
 #
 #
-#           | Raise(expr? exc, expr? cause)
-#           | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
-#           | Assert(expr test, expr? msg)
+#          | Raise(expr? exc, expr? cause)
+#          | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
+#          | Assert(expr test, expr? msg)
 #
-#           | Import(alias* names)
-#           | ImportFrom(identifier? module, alias* names, int? level)
+#          | Import(alias* names)
+#          | ImportFrom(identifier? module, alias* names, int? level)
 #
 #          | Lambda(arguments args, expr body)
 #          | ListComp(expr elt, comprehension* generators)
@@ -52,9 +52,4 @@
 #     -- import name with optional 'as' alias.
 #     alias = (identifier name, identifier? asname)
 #
-#     withitem = (expr context_expr, expr? optional_vars)
-# }
-
-
-
 

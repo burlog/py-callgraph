@@ -9,7 +9,7 @@
 
 from operator import attrgetter
 from abc import ABCMeta, abstractmethod
-from inspect import isroutine, isclass
+from inspect import isroutine, isclass, isbuiltin
 from cached_property import cached_property
 
 from callgraph.utils import getsource
@@ -23,7 +23,8 @@ class Variable(object):
         self.lineno = lineno
 
 class Node(metaclass=ABCMeta):
-    def __init__(self, name, local_name=None):
+    def __init__(self, obj, name, local_name=None):
+        self.obj = obj
         self.children = []
         self.root, self.parent = None, None
         self.local_name = local_name or name
@@ -76,9 +77,9 @@ class Node(metaclass=ABCMeta):
                 return child.obj
         return None
 
-    def get_child(self, name):
+    def get_child(self, obj):
         for child in self.children:
-            if child.local_name == name:
+            if child.obj == obj:
                 return child
         return None
 
@@ -97,7 +98,7 @@ class Node(metaclass=ABCMeta):
 
 class RootNode(Node):
     def __init__(self, *args, **kwargs):
-        super().__init__("root", *args, **kwargs)
+        super().__init__(None, "root", *args, **kwargs)
 
     @property
     def id(self):
@@ -107,9 +108,13 @@ class RootNode(Node):
         return "RootNode()"
 
 class OpaqueNode(Node):
-    def __init__(self, obj):
-        super().__init__(obj.__qualname__, obj.__name__)
-        self.obj = obj
+    def __init__(self, obj, code):
+        super().__init__(obj, obj.__qualname__, obj.__name__)
+        # TODO(burlog): make global registry of fuctions and what they return
+        if self.name == "open":
+            import _io
+            self.returns.append(_io.TextIOWrapper)
+            self.returns.append(_io.BufferedReader)
 
     @property
     def id(self):
@@ -122,16 +127,22 @@ class OpaqueNode(Node):
         return "OpaqueNode(name={0})".format(self.name)
 
 class OpaqueFunctionNode(Node):
-    def __init__(self, obj):
-        super().__init__(obj.__qualname__, obj.__name__)
-        self.obj = obj
+    def __init__(self, obj, code):
+        super().__init__(obj, obj.__qualname__, obj.__name__)
+        self.code = code
+        # TODO(burlog): make global registry of fuctions and what they return
+        if self.name == "_IOBase.__enter__":
+            import _io
+            self.returns.append(_io.TextIOWrapper)
+            self.returns.append(_io.BufferedReader)
 
     @property
     def id(self):
-        return "python:{0}:{1}:{2}"\
-               .format(self.obj.__objclass__.__module__,
-                       self.obj.__objclass__.__name__,
-                       self.obj.__name__)
+        return "python:{0}:{1}:{2}:{3}"\
+               .format(self.code.__objclass__.__module__,
+                       self.code.__objclass__.__name__,
+                       self.local_name,
+                       self.name)
 
     def is_opaque(self):
         return True
@@ -140,9 +151,9 @@ class OpaqueFunctionNode(Node):
         return "OpaqueFunctionNode(name={0})".format(self.name)
 
 class FunctionNode(Node):
-    def __init__(self, obj):
-        super().__init__(obj.__qualname__, obj.__name__)
-        self.obj = obj
+    def __init__(self, obj, code):
+        super().__init__(obj, obj.__qualname__, obj.__name__)
+        self.code = code
         self.ast = ASTTree(self.source)
         self.return_classes = []
 
@@ -152,35 +163,34 @@ class FunctionNode(Node):
 
     @property
     def filename(self):
-        return self.obj.__code__.co_filename
+        return self.code.__code__.co_filename
 
     @property
     def lineno(self):
-        return self.obj.__code__.co_firstlineno
+        return self.code.__code__.co_firstlineno
 
     @cached_property
     def source(self):
-        return getsource(self.obj)
+        return getsource(self.code)
 
     def get_object(self, name):
-        return super().get_object(name) or find_object(self.obj, name)
+        return super().get_object(name) or find_object(self.code, name)
 
     def __repr__(self):
         return "FunctionNode(name={0})".format(self.name)
 
-def make_routine_node(obj):
-    if "__code__" in dir(obj): return FunctionNode(obj)
-    if "__objclass__" in dir(obj): return OpaqueFunctionNode(obj)
-    if "__func__" in dir(obj): return FunctionNode(obj.__func__)
+def make_routine_node(obj, code):
+    if "__code__" in dir(code): return FunctionNode(obj, code)
+    if "__objclass__" in dir(code): return OpaqueFunctionNode(obj, code)
+    if "__func__" in dir(code): return FunctionNode(obj, code.__func__)
+    if isbuiltin(code): return OpaqueNode(obj, code)
     raise NotImplementedError("Unknown object type %s" % str(obj))
 
 def make_node(obj):
-    # TODO(burlog): copy global variables
     if isclass(obj):
-        node = make_routine_node(getattr(obj, "__init__"))
-        node.local_name = obj.__name__
+        node = make_routine_node(obj, code=getattr(obj, "__init__"))
         node.returns.append(obj)
         return node
-    if isroutine(obj): return make_routine_node(obj)
+    if isroutine(obj): return make_routine_node(obj, obj)
     raise NotImplementedError("Unknown object type %s" % str(obj))
 

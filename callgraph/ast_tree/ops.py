@@ -7,20 +7,153 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
-#     expr = BoolOp(boolop op, expr* values)
-#          | BinOp(expr left, operator op, expr right)
-#          | UnaryOp(unaryop op, expr operand)
+from callgraph.ast_tree import Node
 
-#     operator = Add | Sub | Mult | Div | Mod | Pow | LShift
-#                  | RShift | BitOr | BitXor | BitAnd | FloorDiv
-#
-#     unaryop = Invert | Not | UAdd | USub
-#
-#     cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
-#
+class UnaryOpBaseNode(Node):
+    def var_types(self, printer, ctx):
+        yield from self.operand.var_types(printer, ctx)
 
-#     boolop = And | Or
-#
+class InvertNode(UnaryOpBaseNode):
+    pass
 
-#          | Compare(expr left, cmpop* ops, expr* comparators)
+class NotNode(UnaryOpBaseNode):
+    def var_types(self, printer, ctx):
+        yield bool
+
+class UAddNode(UnaryOpBaseNode):
+    pass
+
+class USubNode(UnaryOpBaseNode):
+    pass
+
+class AddNode(Node):
+    pass
+
+class SubNode(Node):
+    pass
+
+class MultNode(Node):
+    pass
+
+class DivNode(Node):
+    pass
+
+class ModNode(Node):
+    pass
+
+class PowNode(Node):
+    pass
+
+class LShiftNode(Node):
+    pass
+
+class RShiftNode(Node):
+    pass
+
+class BitOrNode(Node):
+    pass
+
+class BitXorNode(Node):
+    pass
+
+class BitAndNode(Node):
+    pass
+
+class FloorDivNode(Node):
+    pass
+
+class AndNode(Node):
+    pass
+
+class OrNode(Node):
+    pass
+
+class EqNode(Node):
+    pass
+
+class NotEqNode(Node):
+    pass
+
+class LtNode(Node):
+    pass
+
+class LtENode(Node):
+    pass
+
+class GtNode(Node):
+    pass
+
+class GtENode(Node):
+    pass
+
+class IsNode(Node):
+    pass
+
+class IsNotNode(Node):
+    pass
+
+class InNode(Node):
+    pass
+
+class NotInNode(Node):
+    pass
+
+# TODO(burlog): operators can be overriden and I should look in theese functions
+# TODO(burlog): do it in UnaryOpNode way
+
+class UnaryOpNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.operator = self.make_node(expr_tree.op)
+        self.operator.operand = self.make_node(expr_tree.operand)
+
+    def eval_node(self, printer, ctx):
+        yield from self.operator.evaluate(printer, ctx)
+
+    def var_types(self, printer, ctx):
+        yield from self.operator.var_types(printer, ctx)
+
+class BinOpNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.left = self.make_node(expr_tree.left)
+        self.operator = self.make_node(expr_tree.op)
+        self.right = self.make_node(expr_tree.right)
+
+    def eval_node(self, printer, ctx):
+        yield from self.left.evaluate(printer, ctx)
+        yield from self.operator.evaluate(printer, ctx)
+        yield from self.right.evaluate(printer, ctx)
+
+class BoolOpNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.operator = self.make_node(expr_tree.op)
+        self.operands = self.make_nodes(expr_tree.values)
+
+    def eval_node(self, printer, ctx):
+        yield from self.operator.evaluate(printer, ctx)
+        for operand in self.operands:
+            yield from operand.evaluate(printer, ctx)
+
+    def var_types(self, printer, ctx):
+        for operand in self.operands:
+            yield from operand.var_types(printer, ctx)
+
+class CompareNode(Node):
+    def __init__(self, parent, expr_tree):
+        super().__init__(parent, expr_tree)
+        self.left = self.make_node(expr_tree.left)
+        self.operators = self.make_nodes(expr_tree.ops)
+        self.comparators = self.make_nodes(expr_tree.comparators)
+
+    def eval_node(self, printer, ctx):
+        yield from self.left.evaluate(printer, ctx)
+        for operator in self.operators:
+            yield from operator.evaluate(printer, ctx)
+        for comparator in self.comparators:
+            yield from comparator.evaluate(printer, ctx)
+
+    def var_types(self, printer, ctx):
+        yield bool
 

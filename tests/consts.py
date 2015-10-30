@@ -2,7 +2,7 @@
 #
 # LICENCE       MIT
 #
-# DESCRIPTION   Test suite for classes.
+# DESCRIPTION   Test suite for constants.
 #
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
@@ -13,60 +13,55 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_in_class_call():
+def test_const_load():
     def fun():
-        def fun1():
-            pass
-        class A:
-            a = fun1()
-            def f(self):
-                pass
+        "".strip()
 
     builder = CallGraphBuilder()
     root = builder.build(fun)
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.fun1"]
+    path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="variable visibility context")
-def test_in_class_call_seq():
+def test_const_set():
     def fun():
-        def fun1():
-            return ""
-        class A:
-            a = fun1()
-            a.strip()
-        a.find() # a is invisible outside of class
+        a = {1, 2, 3}
+        a.add(4)
 
     builder = CallGraphBuilder()
     root = builder.build(fun)
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.fun1", "fun.strip"]
+    path = ["fun", "fun.add"]
     assert list(dfs_node_names(root)) == path
 
-def test_base_class():
-    class A(object):
-        def method_a(self):
-            pass
-
-    class B(A):
-        def method_b(self):
-            pass
-
+def test_const_dict():
     def fun():
-        b = B()
-        b.method_a()
-        b.method_b()
+        a = {"a": 1, None: 2, fun: "3"}
+        a.get("a")
 
     builder = CallGraphBuilder()
     root = builder.build(fun)
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.B", "fun.method_a", "fun.method_b"]
+    path = ["fun", "fun.get"]
     assert list(dfs_node_names(root)) == path
+
+def test_const_ellipsis():
+    def fun():
+        a = ...
+
+    fun()
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun"]
+    assert list(dfs_node_names(root)) == path
+
 

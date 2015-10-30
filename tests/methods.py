@@ -17,10 +17,10 @@ def test_simple_methods():
     def fun():
         class A(object):
             def __init__(self):
-                if not self: raise RuntimeError()
+                pass
 
-            def method():
-                if not self: raise RuntimeError()
+            def method(self):
+                pass
 
         a = A()
         a.method()
@@ -37,11 +37,11 @@ def test_static_methods():
     def fun():
         class A(object):
             def __init__(self):
-                if not self: raise RuntimeError()
+                pass
 
             @staticmethod
-            def static_method(x=None):
-                if x: raise RuntimeError()
+            def static_method():
+                pass
 
         a = A()
         a.static_method()
@@ -58,11 +58,11 @@ def test_class_methods():
     def fun():
         class A(object):
             def __init__(self):
-                if not self: raise RuntimeError()
+                pass
 
             @classmethod
-            def class_method(x=None):
-                if x: raise RuntimeError()
+            def class_method(cls):
+                pass
 
         a = A()
         a.class_method()
@@ -79,20 +79,20 @@ def test_class_change_methods():
     def fun():
         class B(object):
             def __init__(self):
-                if not self: raise RuntimeError()
+                pass
 
-            def method_b():
-                if not self: raise RuntimeError()
+            def method_b(self):
+                pass
 
         class A(object):
             def __init__(self):
-                if not self: raise RuntimeError()
+                pass
 
-            def method_b():
-                if not self: raise RuntimeError()
+            def method_b(self):
+                pass
 
-            def method_a(cls):
-                if not cls: raise RuntimeError()
+            def method_a(self):
+                pass
 
         a = A()
         a.method_a()
@@ -106,5 +106,26 @@ def test_class_change_methods():
     #dump_tree(root, lambda x: x.children)
 
     path = ["fun", "fun.A", "fun.method_a", "fun.B", "fun.method_b"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_mismatch():
+    class A(object):
+        def f(self):
+            return ""
+
+    class B(object):
+        def f(self):
+            return []
+
+    def fun():
+        A().f().strip()
+        B().f().sort()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.f", "fun.strip", "fun.B", "fun.f", "fun.sort"]
     assert list(dfs_node_names(root)) == path
 
