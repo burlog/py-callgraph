@@ -29,6 +29,7 @@ class Node(metaclass=ABCMeta):
         self.root, self.parent = None, None
         self.local_name = local_name or name
         self.name = name
+        self.decored_by = ""
         self.variables = {}
         self.returns = []
 
@@ -48,6 +49,10 @@ class Node(metaclass=ABCMeta):
     @property
     def source(self):
         return ""
+
+    @property
+    def real_local_name(self):
+        return self.decored_by or self.local_name
 
     def ids(self):
         return list(map(attrgetter("id"), self.children))
@@ -177,7 +182,40 @@ class FunctionNode(Node):
         return super().get_object(name) or find_object(self.code, name)
 
     def __repr__(self):
-        return "FunctionNode(name={0})".format(self.name)
+        db = ", decored_by=" + self.decored_by if self.decored_by else ""
+        return "FunctionNode(name={0}{1})".format(self.name, db)
+
+class InstanceNode(Node):
+    def __init__(self, obj, code):
+        cls = obj.__class__
+        super().__init__(obj, cls.__qualname__, cls.__name__)
+        print(dir(obj))
+        self.code = code
+        self.ast = ASTTree(self.source)
+        self.return_classes = []
+
+    @property
+    def id(self):
+        return "{0}:{1}".format(self.filename, self.lineno)
+
+    @property
+    def filename(self):
+        return self.code.__code__.co_filename
+
+    @property
+    def lineno(self):
+        return self.code.__code__.co_firstlineno
+
+    @cached_property
+    def source(self):
+        return getsource(self.code)
+
+    def get_object(self, name):
+        return super().get_object(name) or find_object(self.code, name)
+
+    def __repr__(self):
+        #db = ", decored_by=" + self.decored_by if self.decored_by else ""
+        return "InstanceNode(name={0})".format(self.name)
 
 def make_routine_node(obj, code):
     if "__code__" in dir(code): return FunctionNode(obj, code)
@@ -187,10 +225,12 @@ def make_routine_node(obj, code):
     raise NotImplementedError("Unknown object type %s" % str(obj))
 
 def make_node(obj):
+    if isroutine(obj): return make_routine_node(obj, obj)
     if isclass(obj):
-        node = make_routine_node(obj, code=getattr(obj, "__init__"))
+        node = make_routine_node(obj, code=obj.__init__)
         node.returns.append(obj)
         return node
-    if isroutine(obj): return make_routine_node(obj, obj)
+    if "__call__" in dir(obj):
+        return InstanceNode(obj, code=obj.__call__.__func__)
     raise NotImplementedError("Unknown object type %s" % str(obj))
 

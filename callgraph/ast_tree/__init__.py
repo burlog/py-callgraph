@@ -27,4 +27,5 @@ class ASTTree(object):
         self.tree = ast_parse(source)
         self.name = self.tree.body[0].name
         self.body = Node.make_root_nodes(self.tree.body[0].body)
+        self.decors = Node.make_root_nodes(self.tree.body[0].decorator_list)
 

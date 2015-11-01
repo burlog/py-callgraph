@@ -13,7 +13,7 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_func_body():
+def test_functions_body():
     def fun1():
         False
 
@@ -32,7 +32,7 @@ def test_func_body():
     path = ["fun3", "fun3.fun2", "fun3.fun2.fun1", "fun3.fun1"]
     assert list(dfs_node_names(root)) == path
 
-def test_recur():
+def test_functions_recur():
     def recur():
         recur()
 
@@ -42,7 +42,7 @@ def test_recur():
     path = ["recur", "recur.recur"]
     assert list(dfs_node_names(root)) == path
 
-def test_nested():
+def test_functions_nested():
     def nester():
         def nested():
             pass

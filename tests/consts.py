@@ -13,7 +13,7 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_const_load():
+def test_consts_load():
     def fun():
         "".strip()
 
@@ -25,7 +25,7 @@ def test_const_load():
     path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_const_set():
+def test_consts_set():
     def fun():
         a = {1, 2, 3}
         a.add(4)
@@ -38,7 +38,7 @@ def test_const_set():
     path = ["fun", "fun.add"]
     assert list(dfs_node_names(root)) == path
 
-def test_const_dict():
+def test_consts_dict():
     def fun():
         a = {"a": 1, None: 2, fun: "3"}
         a.get("a")
@@ -51,7 +51,7 @@ def test_const_dict():
     path = ["fun", "fun.get"]
     assert list(dfs_node_names(root)) == path
 
-def test_const_ellipsis():
+def test_consts_ellipsis():
     def fun():
         a = ...
 

@@ -13,7 +13,7 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_in_class_call():
+def test_classes_in_class_call():
     def fun():
         def fun1():
             pass
@@ -31,7 +31,7 @@ def test_in_class_call():
     assert list(dfs_node_names(root)) == path
 
 @pytest.mark.skipif(True, reason="variable visibility context")
-def test_in_class_call_seq():
+def test_classes_in_class_call_seq():
     def fun():
         def fun1():
             return ""
@@ -48,7 +48,7 @@ def test_in_class_call_seq():
     path = ["fun", "fun.fun1", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_base_class():
+def test_classes_base_class():
     class A(object):
         def method_a(self):
             pass

@@ -64,7 +64,7 @@ class CallNode(Node):
 class NameNode(Node):
     def __init__(self, parent, expr_tree):
         super().__init__(parent, expr_tree)
-        self.local.callee = None
+        self.local.callee = []
         self.value = expr_tree.id
         self.action = self.make_node(expr_tree.ctx)
 
@@ -72,8 +72,15 @@ class NameNode(Node):
         while False: yield None
 
     def get_callee(self, printer, ctx, args, kwargs):
-        self.local.callee = ctx.get_object(self.value)
-        if self.local.callee: yield self.local.callee, args, kwargs
+        if self.value in ctx.variables:
+            for var_type in ctx.variables[self.value].types:
+                self.local.callee.append(var_type)
+                yield var_type, args, kwargs
+        else:
+            closure_callee = ctx.get_object(self.value)
+            if closure_callee:
+                self.local.callee.append(closure_callee)
+                yield closure_callee, args, kwargs
 
     def eval_assign(self, printer, ctx, value):
         types = list(value.var_types(printer, ctx))
@@ -83,18 +90,22 @@ class NameNode(Node):
 
     def call_types(self, printer, ctx):
         if self.local.callee:
-            child = ctx.get_child(self.local.callee)
-            if child and child.returns:
-                for return_class in child.returns:
-                    yield return_class
-            else: printer("! Empty returns list for function:", self.value)
+            for callee in self.local.callee:
+                child = ctx.get_child(callee)
+                if child and child.returns:
+                    for return_class in child.returns:
+                        yield return_class
+                else: printer("! Empty returns list for function:", self.value)
         else: printer("! Inaccessible callee for function:", self.value)
 
     def var_types(self, printer, ctx):
         if self.value in ctx.variables:
             for var_type in ctx.variables[self.value].types:
                 yield var_type
-        else: printer("! Empty returns list for function:", self.value)
+        else:
+            closure_type = type(ctx.get_object(self.value))
+            if closure_type: yield closure_type
+            else: printer("! Empty returns list for function:", self.value)
 
 class RaiseNode(Node):
     def __init__(self, parent, expr_tree):

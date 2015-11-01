@@ -13,7 +13,7 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_simple_methods():
+def test_methods_simple():
     def fun():
         class A(object):
             def __init__(self):
@@ -33,7 +33,7 @@ def test_simple_methods():
     path = ["fun", "fun.A", "fun.method"]
     assert list(dfs_node_names(root)) == path
 
-def test_static_methods():
+def test_methods_static():
     def fun():
         class A(object):
             def __init__(self):
@@ -54,7 +54,7 @@ def test_static_methods():
     path = ["fun", "fun.A", "fun.static_method"]
     assert list(dfs_node_names(root)) == path
 
-def test_class_methods():
+def test_methods_class():
     def fun():
         class A(object):
             def __init__(self):
@@ -75,7 +75,7 @@ def test_class_methods():
     path = ["fun", "fun.A", "fun.class_method"]
     assert list(dfs_node_names(root)) == path
 
-def test_class_change_methods():
+def test_methods_class_change():
     def fun():
         class B(object):
             def __init__(self):
@@ -108,7 +108,7 @@ def test_class_change_methods():
     path = ["fun", "fun.A", "fun.method_a", "fun.B", "fun.method_b"]
     assert list(dfs_node_names(root)) == path
 
-def test_methods_mismatch():
+def test_methods_methods_mismatch():
     class A(object):
         def f(self):
             return ""

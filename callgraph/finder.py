@@ -9,26 +9,21 @@
 
 import ast, re, builtins
 from types import FunctionType
-from inspect import isfunction, isclass, iscode
+from inspect import iscode, getclosurevars
 
 from callgraph.utils import getsource
 
-def expand_closure(function):
-    for cell in function.__closure__ or []:
-        if hasattr(cell.cell_contents, "__closure__"):
-            if cell.cell_contents != function:
-                for subcell in expand_closure(cell.cell_contents):
-                    yield subcell
-        yield cell.cell_contents
+def_re = re.compile("^def", re.MULTILINE)
+class_re = re.compile("^class", re.MULTILINE)
 
 def scan_globals(function, name):
     return function.__globals__.get(name, None)
 
 def scan_closure(function, name):
-    for obj in expand_closure(function):
-        if isfunction(obj) or isclass(obj):
-            if obj.__name__ == name:
-                return obj
+    closure_vars = getclosurevars(function)
+    return closure_vars.nonlocals.get(name,
+               closure_vars.globals.get(name,
+                   closure_vars.builtins.get(name, None)))
 
 def scan_const(function, name):
     # TODO(burlog): this is ugly bad code that should be improved
@@ -36,10 +31,10 @@ def scan_const(function, name):
         if not iscode(obj): continue
         if not obj.co_name == name: continue
         source = getsource(obj)
-        if source.startswith("def"):
+        if def_re.search(source):
             # TODO(burlog): closure, globals, ...
-            return FunctionType(obj, {})
-        if source.startswith("class"):
+            return FunctionType(obj, function.__globals__.copy())
+        if class_re.search(source):
             ## TODO(burlog): this is really ugly bad code
             class_dict = {}
             eval(obj, function.__globals__.copy(), class_dict)
@@ -49,8 +44,22 @@ def scan_builins(function, name):
     return builtins.__dict__.get(name, None)
 
 def find_object(function, name):
-    return scan_globals(function, name)\
-        or scan_closure(function, name)\
-        or scan_const(function, name)\
-        or scan_builins(function, name)
+    # TODO(burlog): const don't respect decorators
+    for scan in scan_globals, scan_closure, scan_const, scan_builins:
+        value = scan(function, name)
+        if value is not None: return value
+
+def get_std_wrapped_decor_name(wraps_call):
+    if not hasattr(wraps_call, "func"): return None
+    if wraps_call.func.value != "wraps": return None
+    return wraps_call.args[0].value
+
+def scan_std_wrapped(function, node):
+    if "__wrapped__" in dir(function):
+        name = get_std_wrapped_decor_name(node.ast.decors[0])
+        return name, function.__wrapped__
+    return None, None
+
+def find_decor_var(function, node):
+    return scan_std_wrapped(function, node)
 

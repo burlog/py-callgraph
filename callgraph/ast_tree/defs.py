@@ -7,12 +7,16 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
+import ast
+from types import FunctionType
+
 from callgraph.ast_tree import Node
 
 class FunctionDefNode(Node):
     def __init__(self, parent, expr_tree):
         super().__init__(parent, expr_tree)
         self.name = expr_tree.name
+        # TODO(burlog): filename
 
     def eval_node(self, printer, ctx):
         printer("- Skiping function definition:", self.name)

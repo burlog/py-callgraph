@@ -13,7 +13,7 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-def test_simple_assign():
+def test_assigns_assign_simple():
     def fun():
         a = ""
         a.strip()
@@ -26,7 +26,7 @@ def test_simple_assign():
     path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_simple_explode_assign():
+def test_assigns_simple_explode():
     def fun():
         a, b = "", 1
         c, d = ["", 2]
@@ -41,7 +41,7 @@ def test_simple_explode_assign():
     path = ["fun", "fun.lstrip", "fun.rstrip"]
     assert list(dfs_node_names(root)) == path
 
-def test_nested_explode_assign():
+def test_assigns_nested_explode():
     def fun():
         (a, b), c = ("", []), 1
         a.strip()
@@ -56,7 +56,7 @@ def test_nested_explode_assign():
     assert list(dfs_node_names(root)) == path
 
 @pytest.mark.skipif(True, reason="explode tuple result values")
-def test_fun_explode_assign():
+def test_assigns_fun_explode():
     def explode():
         return "", 1
 
@@ -72,7 +72,7 @@ def test_fun_explode_assign():
     path = ["fun", "fun.explode", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_multi_assign():
+def test_assigns_multi():
     def fun():
         a = b = ""
         a.strip()
@@ -86,7 +86,7 @@ def test_multi_assign():
     path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_assign_from_fun_str():
+def test_assigns_assign_from_fun_str():
     def fun1():
         return ""
 
@@ -102,7 +102,7 @@ def test_assign_from_fun_str():
     path = ["fun", "fun.fun1", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_assign_from_fun_obj():
+def test_assigns_assign_from_fun_obj():
     class A(object):
         def method(self):
             pass
@@ -122,7 +122,7 @@ def test_assign_from_fun_obj():
     path = ["fun", "fun.fun1", "fun.fun1.A", "fun.method"]
     assert list(dfs_node_names(root)) == path
 
-def test_assign_from_fun_var():
+def test_assigns_assign_from_fun_var():
     class A(object):
         def method(self):
             pass
@@ -143,7 +143,7 @@ def test_assign_from_fun_var():
     path = ["fun", "fun.fun1", "fun.fun1.A", "fun.method"]
     assert list(dfs_node_names(root)) == path
 
-def test_cond_assign():
+def test_assigns_cond():
     def fun():
         a = 3 if None else "3"
         a.strip()

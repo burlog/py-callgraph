@@ -7,9 +7,10 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
-from inspect import signature
+from inspect import signature, unwrap, getclosurevars
 from operator import attrgetter
 
+from callgraph.finder import find_decor_var
 from callgraph.nodes import Node, RootNode, make_node
 from callgraph.indent_printer import IndentPrinter, NonePrinter, dump_tree
 
@@ -45,11 +46,11 @@ class CallGraphBuilder(object):
 
         # magic follows
         with self.printer as iprinter:
-            # TODO(burlog): signature
-            self.init_variables(iprinter, function, args, kwargs, node)
+            # TODO(burlog): process signature? are defaults run during import?
+            self.inject_decorated(iprinter, function, node)
+            self.inject_arguments(iprinter, function, args, kwargs, node)
 
-            # TODO(burlog): decorators
-            # TODO(burlog): closure
+            # process function body
             for expr in node.ast.body:
                 lineno = node.lineno + expr.lineno
                 iprinter("+ line at {0}:{1}".format(node.filename, lineno))
@@ -57,7 +58,7 @@ class CallGraphBuilder(object):
                 for callee, args, kwargs in expr.evaluate(iprinter, node):
                     self.process(callee, node, args, kwargs)
 
-    def init_variables(self, printer, function, args, kwargs, node):
+    def inject_arguments(self, printer, function, args, kwargs, node):
         bound = signature(function).bind_partial(*args, **kwargs)
         ## TODO(burlog): default args
         #for param in sig.parameters.values():
@@ -65,8 +66,15 @@ class CallGraphBuilder(object):
         #         if param.default is not param.empty:
         #             pass #ba.arguments[param.name] = param.default
         for name, value in bound.arguments.items():
-            printer("- Binding argument:", name + "=" + str(value))
+            printer("% Binding argument:", name + "=" + str(value))
             node.replace_variable(name, value, node.lineno)
+
+    def inject_decorated(self, printer, function, node):
+        name, value = find_decor_var(function, node)
+        if name:
+            node.replace_variable(name, [value], node.lineno)
+            printer("% Binding decorated:", name + "=" + str(value))
+            node.decored_by = node.ast.name
 
 if __name__ == "__main__":
     builder = CallGraphBuilder()
