@@ -30,6 +30,6 @@ def test_self_obj_simple():
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "un.A", "fun.method", "fun.method.rstrip"]
+    path = ["fun", "fun.A", "fun.method", "fun.method.rstrip"]
     assert list(dfs_node_names(root)) == path
 
