@@ -32,6 +32,7 @@ def test_decorators_simple():
 
     path = ["decorating", "decorating.rstrip", "decorating.decorated",
             "decorating.decorated.lstrip"]
+    print("==")
     assert list(dfs_node_names(root)) == path
 
 def test_decorators_chain():

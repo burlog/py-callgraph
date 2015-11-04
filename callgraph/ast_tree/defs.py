@@ -11,6 +11,7 @@ import ast
 from types import FunctionType
 
 from callgraph.ast_tree import Node
+from callgraph.ast_tree.helpers import VariablesScope
 
 class FunctionDefNode(Node):
     def __init__(self, parent, expr_tree):
@@ -34,7 +35,7 @@ class ClassDefNode(Node):
         self.decors = self.make_nodes(expr_tree.decorator_list)
 
     def eval_node(self, printer, ctx):
-        for expr in self.body:
-            yield from expr.evaluate(printer, ctx)
-
+        with VariablesScope(ctx) as scope:
+            for expr in self.body:
+                yield from expr.evaluate(printer, ctx)
 

@@ -10,7 +10,8 @@
 import ast
 
 from callgraph.ast_tree import Node
-from callgraph.ast_tree.helpers import VariablesContext
+from callgraph.symbols import MultiSymbol, isiterable
+from callgraph.ast_tree.helpers import VariablesScope
 from callgraph.ast_tree.helpers import UniqueNameGenerator
 
 class IfNode(Node):
@@ -39,10 +40,11 @@ class IfExpNode(Node):
         yield from self.body.evaluate(printer, ctx)
         yield from self.orelse.evaluate(printer, ctx)
 
-    def var_types(self, printer, ctx):
-        yield from self.body.var_types(printer, ctx)
-        if self.orelse:
-            yield from self.orelse.var_types(printer, ctx)
+    def load(self, printer, ctx):
+        if not self.orelse: return self.body.load(printer, ctx)
+        body = self.body.load(printer, ctx)
+        orelse = self.orelse.load(printer, ctx)
+        return MultiSymbol("__if__", [body, orelse])
 
 class ForNode(Node):
     def __init__(self, parent, expr_tree):
@@ -55,10 +57,19 @@ class ForNode(Node):
     def eval_node(self, printer, ctx):
         yield from self.target.evaluate(printer, ctx)
         yield from self.foriter.evaluate(printer, ctx)
-        for node in self.body:
-            yield from node.evaluate(printer, ctx)
-        for node in self.orelse:
-            yield from node.evaluate(printer, ctx)
+        with VariablesScope(ctx) as scope:
+            self.target.store(printer, ctx, self.unroll_iterables(printer, ctx))
+            scope.freeze()
+            for node in self.body:
+                yield from node.evaluate(printer, ctx)
+            for node in self.orelse:
+                yield from node.evaluate(printer, ctx)
+
+    def unroll_iterables(self, printer, ctx):
+        if not hasattr(self.foriter, "unroll"):
+            return self.foriter.load(printer, ctx)
+        values = list(self.foriter.unroll(printer, ctx))
+        return MultiSymbol("__for_unroll__", values)
 
 class WhileNode(Node):
     def __init__(self, parent, expr_tree):
@@ -81,9 +92,10 @@ class WithNode(Node):
         self.body = self.make_nodes(expr_tree.body)
 
     def eval_node(self, printer, ctx):
-        with VariablesContext(ctx.variables):
+        with VariablesScope(ctx) as scope:
             for item in self.items:
                 yield from item.evaluate(printer, ctx)
+            scope.freeze()
             for expr in self.body:
                 yield from expr.evaluate(printer, ctx)
             for item in self.items:

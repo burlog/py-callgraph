@@ -48,7 +48,7 @@ def test_functions_nested():
             pass
         def invisible():
             nested()
-        return nested()
+        nested()
 
     builder = CallGraphBuilder()
     root = builder.build(nester)
@@ -56,6 +56,22 @@ def test_functions_nested():
     dump_tree(root, lambda x: x.children)
 
     path = ["nester", "nester.nested"]
+    assert list(dfs_node_names(root)) == path
+
+def test_functions_stored_fun():
+    def fun1():
+        "".strip()
+
+    def fun():
+        a = fun1
+        a()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.fun1", "fun.fun1.strip"]
     assert list(dfs_node_names(root)) == path
 
 #def test_default_arg():

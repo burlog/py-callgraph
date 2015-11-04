@@ -13,10 +13,9 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
-@pytest.mark.skipif(True, reason="explode foriter: tuple, yield, ...")
-def test_stmt_for():
+def test_stmt_for_tuple():
     def fun1():
-        for var in ["", 1]:
+        for var in ("", 1):
             var.to_bytes()
 
     def fun():
@@ -29,7 +28,36 @@ def test_stmt_for():
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.strip", "fun.to_bytes"]
+    path = ["fun", "fun.strip", "fun.fun1", "fun.fun1.to_bytes"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_for_none_and_tuple():
+    def fun():
+        var_list = ["", ""]
+        if None: var_list = None
+        for var1, var2 in var_list:
+            var1.lstrip()
+            var2.rstrip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_for_dict():
+    def fun():
+        for key in {"k1": 1, "k2": 2}:
+            key.strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
 def test_stmt_while():
@@ -63,14 +91,14 @@ def test_stmt_with_opaque():
     def fun():
         with open("f") as f:
             f.read()
+        f.write()
 
     builder = CallGraphBuilder()
     root = builder.build(fun)
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.open", "fun.__enter__", "fun.read", "fun.read",
-            "fun.__exit__"]
+    path = ["fun", "fun.open", "fun.__enter__", "fun.read", "fun.__exit__"]
     assert list(dfs_node_names(root)) == path
 
 def test_stmt_with_single():
@@ -131,7 +159,6 @@ def test_stmt_with_pair():
             "fun.__exit__", "fun.__exit__.from_bytes"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="explode tuple result values")
 def test_stmt_with_tuple():
     class A():
         def __enter__(self):
@@ -151,6 +178,7 @@ def test_stmt_with_tuple():
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.to_bytes", "fun.strip"]
+    path = ["fun", "fun.A", "fun.__enter__", "fun.to_bytes", "fun.strip",
+            "fun.__exit__"]
     assert list(dfs_node_names(root)) == path
 

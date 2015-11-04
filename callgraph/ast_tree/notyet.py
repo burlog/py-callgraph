@@ -1,7 +1,3 @@
-#          | Return(expr? value)
-#          | Yield(expr? value)
-#          | YieldFrom(expr value)
-#
 #          | Delete(expr* targets)
 #          | Assign(expr* targets, expr value)
 #          | AugAssign(expr target, operator op, expr value)

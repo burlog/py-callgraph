@@ -30,7 +30,6 @@ def test_classes_in_class_call():
     path = ["fun", "fun.fun1"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="variable visibility context")
 def test_classes_in_class_call_seq():
     def fun():
         def fun1():

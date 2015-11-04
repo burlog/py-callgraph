@@ -8,17 +8,18 @@
 #
 
 from callgraph.ast_tree import Node
+from callgraph.symbols import ConstantSymbol, MultiSymbol
 
 class UnaryOpBaseNode(Node):
-    def var_types(self, printer, ctx):
-        yield from self.operand.var_types(printer, ctx)
+    def load(self, printer, ctx):
+        return self.operand.load(printer, ctx)
 
 class InvertNode(UnaryOpBaseNode):
     pass
 
 class NotNode(UnaryOpBaseNode):
-    def var_types(self, printer, ctx):
-        yield bool
+    def load(self, printer, ctx):
+        return ConstantSymbol(True)
 
 class UAddNode(UnaryOpBaseNode):
     pass
@@ -110,8 +111,8 @@ class UnaryOpNode(Node):
     def eval_node(self, printer, ctx):
         yield from self.operator.evaluate(printer, ctx)
 
-    def var_types(self, printer, ctx):
-        yield from self.operator.var_types(printer, ctx)
+    def load(self, printer, ctx):
+        return self.operator.load(printer, ctx)
 
 class BinOpNode(Node):
     def __init__(self, parent, expr_tree):
@@ -136,9 +137,9 @@ class BoolOpNode(Node):
         for operand in self.operands:
             yield from operand.evaluate(printer, ctx)
 
-    def var_types(self, printer, ctx):
-        for operand in self.operands:
-            yield from operand.var_types(printer, ctx)
+    def load(self, printer, ctx):
+        symbols = iter(o.load(printer, ctx) for o in self.operands)
+        return MultiSymbol("__boolop__", symbols)
 
 class CompareNode(Node):
     def __init__(self, parent, expr_tree):
@@ -154,6 +155,6 @@ class CompareNode(Node):
         for comparator in self.comparators:
             yield from comparator.evaluate(printer, ctx)
 
-    def var_types(self, printer, ctx):
-        yield bool
+    def load(self, printer, ctx):
+        return ConstantSymbol(True)
 

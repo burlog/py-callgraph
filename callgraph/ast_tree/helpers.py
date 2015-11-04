@@ -7,17 +7,19 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
-class VariablesContext(object):
-    def __init__(self, dst):
-        self.dst, self.keys = dst, list(dst.keys())
+class VariablesScope(object):
+    def __init__(self, ctx):
+        self.ctx, self.var_names = ctx, ctx.var_names.copy()
 
     def __enter__(self):
-        print(">>>", self.keys)
-        pass
+        return self
 
     def __exit__(self, exp_type, exp_value, traceback):
-        print("<<<", self.keys)
-        map(self.dst.pop, self.keys)
+        var_names = getattr(self, "freezed_var_names", self.ctx.var_names)
+        for var_name in var_names - self.var_names: self.ctx.scope.pop(var_name)
+
+    def freeze(self):
+        self.freezed_var_names = self.ctx.var_names.copy()
 
 class UniqueNameGenerator(object):
     """ Generates unique names.
@@ -28,5 +30,4 @@ class UniqueNameGenerator(object):
     def make_unique_name(self, prefix="unique_name"):
         UniqueNameGenerator.counter += 1
         return "{0}_{1}".format(prefix, UniqueNameGenerator.counter)
-
 

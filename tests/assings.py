@@ -41,6 +41,19 @@ def test_assigns_simple_explode():
     path = ["fun", "fun.lstrip", "fun.rstrip"]
     assert list(dfs_node_names(root)) == path
 
+def test_assigns_set_explode():
+    def fun():
+        a, b = {"", 2}
+        a.rstrip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
 def test_assigns_nested_explode():
     def fun():
         (a, b), c = ("", []), 1
@@ -55,7 +68,6 @@ def test_assigns_nested_explode():
     path = ["fun", "fun.strip", "fun.append"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="explode tuple result values")
 def test_assigns_fun_explode():
     def explode():
         return "", 1
@@ -154,5 +166,25 @@ def test_assigns_cond():
     dump_tree(root, lambda x: x.children)
 
     path = ["fun", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_assigns_attr_chain_call():
+    class A(object):
+        def f(self):
+            return B()
+
+    class B(object):
+        def method(self):
+            pass
+
+    def fun():
+        A().f().method()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.f", "fun.f.B", "fun.method"]
     assert list(dfs_node_names(root)) == path
 

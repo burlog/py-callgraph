@@ -7,6 +7,8 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
+from callgraph.symbols import InvalidSymbol
+
 class NodeLocalVariables(object):
     pass
 
@@ -100,21 +102,12 @@ class Node(NodeFactory, NodeBase):
         for field in self.node_fields():
             yield from field.evaluate(printer, ctx)
 
-    def get_callee(self, printer, ctx, args, kwargs):
-        printer("! Unimplemented callee extraction:", self)
-        while False: yield None
+    def load(self, printer, ctx):
+        printer("? Can't load symbol:", self)
+        return InvalidSymbol("__none__")
 
-    def var_types(self, printer, ctx):
-        while False: yield None
-
-    def call_types(self, printer, ctx):
-        while False: yield None
-
-    def assigment_value(self, i):
-        return self
-
-    def eval_assign(self, printer, ctx, value):
-        printer("? ignoring assign for target:", self)
+    def store(self, printer, ctx, value):
+        printer("? Can't store symbol:", self)
 
 class UnknownNode(Node):
     """ The class for all nodes that are not implemented.
