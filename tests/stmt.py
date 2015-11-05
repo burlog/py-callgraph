@@ -13,6 +13,19 @@ from functools import wraps
 from callgraph.builder import CallGraphBuilder
 from tests.helpers import dfs_node_names
 
+def test_stmt_call_none():
+    def fun():
+        a = None
+        a()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun"]
+    assert list(dfs_node_names(root)) == path
+
 def test_stmt_for_tuple():
     def fun1():
         for var in ("", 1):
@@ -180,5 +193,242 @@ def test_stmt_with_tuple():
 
     path = ["fun", "fun.A", "fun.__enter__", "fun.to_bytes", "fun.strip",
             "fun.__exit__"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try():
+    def fun():
+        try:
+            "".strip()
+        except RuntimeError as e:
+            print(e.with_traceback())
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip", "fun.with_traceback", "fun.print"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_two_types():
+    def fun():
+        try:
+            "".strip()
+        except (RuntimeError, ValueError) as e:
+            print(e.with_traceback())
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip", "fun.with_traceback", "fun.print"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_two_except():
+    def fun1(e):
+        print(e.with_traceback())
+
+    def fun():
+        try:
+            "".strip()
+        except RuntimeError as e:
+            print(e.with_traceback())
+        except ValueError as e:
+            fun1(e)
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip", "fun.with_traceback", "fun.print", "fun.fun1",
+            "fun.fun1.with_traceback", "fun.fun1.print"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_empty_var():
+    def fun():
+        try:
+            "".lstrip()
+        except RuntimeError:
+            "".rstrip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_empty():
+    def fun():
+        try:
+            "".lstrip()
+        except:
+            "".rstrip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_finally():
+    def fun():
+        try:
+            "".lstrip()
+        except:
+            "".rstrip()
+        finally:
+            "".index()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip", "fun.index"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_try_else():
+    def fun():
+        try:
+            "".lstrip()
+        except:
+            "".rstrip()
+        else:
+            "".index()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip", "fun.index"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_raise_simple():
+    def fun():
+        raise RuntimeError()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.RuntimeError"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_raise_cause():
+    def fun():
+        try:
+            pass
+        except RuntimeError as e:
+            raise RuntimeError() from e
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.RuntimeError"]
+    assert list(dfs_node_names(root)) == path
+
+def test_stmt_assert():
+    def fun1():
+        return 1
+
+    def fun2():
+        return 2
+
+    def fun():
+        assert fun1() == fun2()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.fun1", "fun.fun2"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="lambda implementation")
+def test_stmt_lambda_simple():
+    def fun():
+        a = lambda x: x.strip()
+        a("")
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="lambda implementation")
+def test_stmt_lambda_two_lambdas():
+    def fun():
+        a = lambda x: x.lstrip()
+        b = lambda x: x.rstrip()
+        a("")
+        b("")
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.lstrip", "fun.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="lambda implementation")
+def test_stmt_lambda_closure():
+    def fun():
+        y = ""
+        a = lambda x: x.rstrip() and y.lstrip()
+        a("")
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.rstrip", "fun.lstrip"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="lambda implementation")
+def test_stmt_lambda_returns():
+    def fun():
+        a = lambda x: x
+        a("").strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="lambda implementation")
+def test_stmt_lambda_in_ctor():
+    class A:
+        def __init__(self):
+            a = lambda x: x.strip()
+            a("")
+
+    def fun():
+        A()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.A.strip"]
     assert list(dfs_node_names(root)) == path
 

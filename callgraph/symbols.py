@@ -133,6 +133,28 @@ class InvalidSymbol(Symbol):
     def __iter__(self):
         while True: yield self
 
+class LambdaSymbol(Symbol):
+    def __init__(self, args, body):
+        super().__init__("__lambda__")
+        self.args = args
+        self.value = body
+
+    def get(self, name, free=True):
+        return None
+
+    def set(self, name, value):
+        raise RuntimeError("You can't assing attribute to lambda symbol")
+
+    def values(self):
+        yield self
+
+    def __bool__(self):
+        return True
+
+    def __iter__(self):
+        # TODO(burlog): can be lambda iterable?
+        while True: yield self
+
 class MultiSymbol(Symbol):
     def __init__(self, name, value_list):
         super().__init__(name)
@@ -162,8 +184,8 @@ class MultiSymbol(Symbol):
 
     def set(self, name, value):
         assert isinstance(value, Symbol)
-        for value in self.value_list:
-            value.set(name, value)
+        for symbol in self.value_list:
+            symbol.set(name, value)
 
     def aux_repr(self):
         yield from super().aux_repr()
@@ -278,6 +300,7 @@ def find_symbol(value, name):
         if obj == min: return MinBuiltinSymbol()
         if obj == max: return MaxBuiltinSymbol()
         if obj == next: return NextBuiltinSymbol()
-        raise NotImplementedError("Unknown builtin symbol: " + name)
+        return InvalidSymbol(name)
+        #raise NotImplementedError("Unknown builtin symbol: " + name)
     return UnarySymbol(name, obj)
 

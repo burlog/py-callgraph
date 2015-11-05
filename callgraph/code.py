@@ -7,6 +7,7 @@
 # AUTHOR        Michal Bukovsky <michal.bukovsky@trilogic.cz>
 #
 
+import ast
 from cached_property import cached_property
 from inspect import isclass, isbuiltin
 
@@ -64,6 +65,38 @@ class TransparentCode(Code):
     def wraps(self):
         return self._wraps
 
+class LambdaCode(Code):
+    def __init__(self, ast_tree):
+        self.ast_tree = ast_tree
+        self.ast_tree.name = "__lambda__"
+
+    @property
+    def id(self):
+        return "TODO(burlog): " + str(self.ast_tree)
+
+    @property
+    def is_opaque(self):
+        return False
+
+    @property
+    def filename(self):
+        return "TODO(burlog): nowhere"
+
+    @property
+    def lineno(self):
+        return self.ast_tree.value.lineno
+
+    @cached_property
+    def source(self):
+        return ""
+
+    @cached_property
+    def ast(self):
+        return self.ast_tree
+
+    def source_line(self, i):
+        return "TODO(burlog): temporary nothing"
+
 class OpaqueCode(Code):
     def __init__(self, obj):
         self.obj = obj
@@ -115,7 +148,8 @@ def make_code(obj, aux_name=""):
     if isclass(obj):
         return make_code(obj.__init__, aux_name=obj.__qualname__)
     if isbuiltin(obj): return OpaqueFunctionCode(obj)
+    if isinstance(obj, ast.AST): return LambdaCode(obj)
     #if "__call__" in dir(obj): return CallCode(obj)
-    print(dir(obj))
+    print(obj, dir(obj))
     raise NotImplementedError("Unknown object type %s" % str(obj))
 

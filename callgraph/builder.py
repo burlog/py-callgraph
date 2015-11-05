@@ -70,6 +70,9 @@ class CallGraphBuilder(object):
         # TODO(burlog): fix __init__ rubbish
         function = node.symbol.value.__init__ \
                 if isclass(node.symbol.value) else node.symbol.value
+        # TODO(burlog): fix __lambda__ objects
+        import ast
+        if isinstance(function, ast.AST): return
 
         # insert self if there is one
         sig = signature(function)

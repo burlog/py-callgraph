@@ -80,3 +80,22 @@ def test_generators_multi():
     path = ["fun", "fun.generator", "fun.strip", "fun.to_bytes"]
     assert list(dfs_node_names(root)) == path
 
+def test_generators_yield_from():
+    def generator2():
+        yield ""
+
+    def generator1():
+        yield from generator2()
+
+    def fun():
+        for entry in generator1():
+            entry.strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.generator1", "fun.generator1.generator2", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+

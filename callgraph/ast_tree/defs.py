@@ -17,7 +17,7 @@ class FunctionDefNode(Node):
     def __init__(self, parent, expr_tree):
         super().__init__(parent, expr_tree)
         self.name = expr_tree.name
-        # TODO(burlog): filename
+        # TODO(burlog): filename, calls from defaults, ...
 
     def eval_node(self, printer, ctx):
         printer("- Skiping function definition:", self.name)
