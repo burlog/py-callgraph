@@ -4,7 +4,7 @@ python:
 install:
     - pip install pytest cached-property
 script:
-    - py.test
+    - py.test --cov=callgraph
 before_install:
       - pip install codecov
 after_success:
