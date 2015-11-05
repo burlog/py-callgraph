@@ -2,4 +2,4 @@
 
 Python module for creating static callgraph.
 
-![tests results](https://travis-ci.org/burlog/py-static-callgraph.svg?branch=master)
+[![tests](https://travis-ci.org/burlog/py-static-callgraph.svg?branch=master)](https://travis-ci.org/burlog/py-static-callgraph)
