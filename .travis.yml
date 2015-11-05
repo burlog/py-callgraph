@@ -1,5 +1,11 @@
 language: python
 python:
   - "3.4"
-install: "pip install pytest cached-property"
-script: py.test
+install:
+    - pip install pytest cached-property
+script:
+    - py.test
+before_install:
+      - pip install codecov
+after_success:
+      - codecov
