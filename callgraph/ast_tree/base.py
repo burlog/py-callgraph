@@ -69,10 +69,6 @@ class NodeBase(object):
             if isinstance(field_value, Node):
                 yield field_value
 
-    def all_fields(self):
-        for field_name in self._fields:
-            yield getattr(self, field_name)
-
     def evaluate(self, printer, ctx):
         printer("= Evaluating node:", self)
         with printer as iprinter:
