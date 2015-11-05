@@ -2,7 +2,7 @@ language: python
 python:
   - "3.4"
 install:
-    - pip install pytest cached-property
+    - pip install pytest cached-property pytest-cov
 script:
     - py.test --cov=callgraph
 before_install:
