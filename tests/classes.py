@@ -94,6 +94,106 @@ def test_classes_base_class_super():
             "fun.method.strip"]
     assert list(dfs_node_names(root)) == path
 
+def test_classes_method_super():
+    class A(object):
+        def __init__(self):
+            pass
+
+        def method(self):
+            "".rstrip()
+
+    class B(A):
+        def __init__(self):
+            pass
+
+        def method(self):
+            "".lstrip()
+            super().method()
+
+    def fun():
+        b = B()
+        b.method()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.B", "fun.method", "fun.method.lstrip",
+            "fun.method.__super__", "fun.method.method",
+            "fun.method.method.rstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_classes_base_class_super_init_with_params():
+    class A(object):
+        def __init__(self, a):
+            a.strip()
+
+    class B(A):
+        def __init__(self, a):
+            super().__init__(a)
+
+    def fun():
+        b = B("")
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.B", "fun.B.__super__", "fun.B.A", "fun.B.A.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_classes_base_class_super_with_params():
+    class A(object):
+        def __init__(self):
+            "".strip()
+
+    class B(A):
+        def __init__(self):
+            super(B, self).__init__()
+
+    def fun():
+        b = B()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.B", "fun.B.__super__", "fun.B.A", "fun.B.A.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_classes_class_method_super():
+    class A(object):
+        def __init__(self):
+            pass
+
+        @classmethod
+        def class_method(cls):
+            "".strip()
+
+    class B(A):
+        def __init__(self):
+            pass
+
+        @classmethod
+        def class_method(cls):
+            super().class_method()
+
+    def fun():
+        B.class_method()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.class_method", "fun.class_method.__super__",
+            "fun.class_method.class_method",
+            "fun.class_method.class_method.strip"]
+    assert list(dfs_node_names(root)) == path
+
 def test_classes_self_between_fun():
     class A(object):
         def __init__(self):
