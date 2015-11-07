@@ -70,6 +70,7 @@ class NodeBase(object):
                 yield field_value
 
     def evaluate(self, printer, ctx):
+        ctx.builder.set_current_lineno(printer, self.lineno)
         printer("= Evaluating node:", self)
         with printer as iprinter:
             yield from self.eval_node(iprinter, ctx)
@@ -100,7 +101,7 @@ class Node(NodeFactory, NodeBase):
 
     def load(self, printer, ctx):
         printer("? Can't load symbol:", self)
-        return InvalidSymbol("__none__")
+        return InvalidSymbol(ctx.builder, "__none__")
 
     def store(self, printer, ctx, value):
         printer("? Can't store symbol:", self)

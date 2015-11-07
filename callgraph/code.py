@@ -14,8 +14,6 @@ from inspect import isclass, isbuiltin
 from callgraph.ast_tree import ASTTree
 from callgraph.utils import getsource
 
-# TODO(burlog): make global registry of fuctions and what they return
-
 class Code(object): # TODO(burlog): meta?
     @property
     def filename(self):
@@ -39,19 +37,19 @@ class Code(object): # TODO(burlog): meta?
 
     def source_line(self, i):
         lines = self.source.split("\n")
-        if i > len(lines):
-            pattern = "# invalid lineno: lines={0}, line={1}"
-            return pattern.format(len(lines), i)
-        line = lines[i]
-        while line.endswith("\\"):
-            i += 1
-            line = line.rstrip(" \t\\") + " " + lines[i].lstrip(" \t")
-        return line
+        if 0 <= i < len(lines):
+            line = lines[i]
+            while line.endswith("\\"):
+                i += 1
+                line = line.rstrip(" \t\\") + " " + lines[i].lstrip(" \t")
+            return line
+        pattern = "# invalid lineno: lines={0}, line={1}"
+        return pattern.format(len(lines), i)
 
 class TransparentCode(Code):
     def __init__(self, obj):
         self.code = obj.__code__
-        self._wraps = getattr(obj, "__wrapped__", None)
+        self.wrapped_obj = getattr(obj, "__wrapped__", None)
 
     @property
     def id(self):
@@ -63,7 +61,7 @@ class TransparentCode(Code):
 
     @property
     def wraps(self):
-        return self._wraps
+        return self.wrapped_obj
 
 class LambdaCode(Code):
     def __init__(self, ast_tree):
@@ -137,6 +135,15 @@ class OpaqueSlotCode(OpaqueCode):
                        self.aux_name,
                        self.obj.__name__)
 
+class InvalidCode(OpaqueCode):
+    def __init__(self, obj):
+        super().__init__(obj)
+
+    @property
+    def id(self):
+        return "python:{0}"\
+               .format(self.obj)
+
 def make_code(obj, aux_name=""):
     if "__code__" in dir(obj):
         return TransparentCode(obj)
@@ -149,7 +156,7 @@ def make_code(obj, aux_name=""):
         return make_code(obj.__init__, aux_name=obj.__qualname__)
     if isbuiltin(obj): return OpaqueFunctionCode(obj)
     if isinstance(obj, ast.AST): return LambdaCode(obj)
-    #if "__call__" in dir(obj): return CallCode(obj)
-    print(obj, dir(obj))
-    raise NotImplementedError("Unknown object type %s" % str(obj))
+    # TODO(burlog): __call__ and OpaqueFunctionCode is hack
+    if "__call__" in dir(obj): return OpaqueFunctionCode(obj.__call__)
+    return InvalidCode(obj)
 

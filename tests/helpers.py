@@ -10,6 +10,7 @@
 def depth_first_traverse(parent):
     yield parent
     for node in parent.children:
+        if node.invalid: continue
         yield from depth_first_traverse(node)
 
 def dfs_node_names(root):

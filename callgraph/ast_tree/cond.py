@@ -8,11 +8,13 @@
 #
 
 import ast
+from itertools import chain
 
 from callgraph.ast_tree import Node
-from callgraph.symbols import MultiSymbol, isiterable
+from callgraph.symbols import MultiSymbol, InvalidSymbol, make_result_symbol
 from callgraph.ast_tree.helpers import VariablesScope
 from callgraph.ast_tree.helpers import UniqueNameGenerator
+from callgraph.ast_tree.helpers import empty
 
 class IfNode(Node):
     def __init__(self, parent, expr_tree):
@@ -44,7 +46,9 @@ class IfExpNode(Node):
         if not self.orelse: return self.body.load(printer, ctx)
         body = self.body.load(printer, ctx)
         orelse = self.orelse.load(printer, ctx)
-        return MultiSymbol("__if__", [body, orelse])
+        values = chain(body.values(), orelse.values())
+        geners = chain(body.geners(), orelse.geners())
+        return MultiSymbol(ctx.builder, "__if__", values, geners)
 
 class ForNode(Node):
     def __init__(self, parent, expr_tree):
@@ -58,18 +62,45 @@ class ForNode(Node):
         yield from self.target.evaluate(printer, ctx)
         yield from self.foriter.evaluate(printer, ctx)
         with VariablesScope(ctx) as scope:
-            self.target.store(printer, ctx, self.unroll_iterables(printer, ctx))
+            yield from self.unroll_foriter(printer, ctx)
             scope.freeze()
+            if empty(scope.vars_in_scope()):
+                symbol = InvalidSymbol(ctx.builder, "__unroll__")
+                self.target.store(printer, ctx, symbol)
             for node in self.body:
                 yield from node.evaluate(printer, ctx)
             for node in self.orelse:
                 yield from node.evaluate(printer, ctx)
 
-    def unroll_iterables(self, printer, ctx):
-        if not hasattr(self.foriter, "unroll"):
-            return self.foriter.load(printer, ctx)
-        values = list(self.foriter.unroll(printer, ctx))
-        return MultiSymbol("__for_unroll__", values)
+    def unroll_foriter(self, printer, ctx):
+        iter_symbol = self.foriter.load(printer, ctx)
+        for symbol in iter_symbol.geners():
+            self.target.store(printer, ctx, symbol)
+        for symbol in iter_symbol.values():
+            if symbol.isiterable(): self.unroll_iterables(printer, ctx, symbol)
+            else: yield from self.unroll_generator_iter(printer, ctx, symbol)
+
+    def unroll_iterables(self, printer, ctx, iter_symbol):
+        symbol = MultiSymbol(ctx.builder, "__unroll__", list(iter_symbol))
+        self.target.store(printer, ctx, symbol)
+
+    def unroll_generator_iter(self, printer, ctx, obj_symbol):
+        iter_symbol = obj_symbol.get("__iter__", free=False)
+        if iter_symbol:
+            yield iter_symbol, [], {}
+            result_symbol = make_result_symbol(ctx.builder, iter_symbol)
+            for symbol in result_symbol.geners():
+                self.target.store(printer, ctx, symbol)
+            for symbol in result_symbol.values():
+                yield from self.unroll_generator_next(printer, ctx, symbol)
+
+    def unroll_generator_next(self, printer, ctx, obj_symbol):
+        next_symbol = obj_symbol.get("__next__", free=False)
+        if next_symbol:
+            yield next_symbol, [], {}
+            result_symbol = make_result_symbol(ctx.builder, next_symbol)
+            for symbol in result_symbol.values():
+                self.target.store(printer, ctx, symbol)
 
 class WhileNode(Node):
     def __init__(self, parent, expr_tree):
@@ -104,6 +135,7 @@ class WithNode(Node):
 class WithItemNode(Node, UniqueNameGenerator):
     def __init__(self, parent, expr_tree):
         super().__init__(parent, expr_tree)
+
         # Can be simply translated to:
 
         # var_name = context_expr

@@ -8,6 +8,7 @@
 #
 
 from cached_property import cached_property
+from operator import attrgetter
 
 from callgraph.code import make_code
 
@@ -20,37 +21,30 @@ class NodePath(object):
         while current.parent:
             yield current
             current = current.parent
+        yield current
 
     def __contains__(self, other):
         for current in self:
-            if current.id == other.id:
-                return True
-        return False
-
-class Children(object):
-    def __init__(self):
-        self.children = []
-
-    def append(self, child):
-        self.children.append(child)
-
-    def __iter__(self):
-        yield from self.children
-
-    def __contains__(self, other):
-        for current in self.children:
-            if current.id == other.id:
+            if current == other:
                 return True
         return False
 
 class Node(object):
-    def __init__(self, symbol):
+    def __init__(self, symbol, invalid=False):
         self.root = None
         self.parent = None
-        self.children = Children()
-        if symbol:
-            self.symbol = symbol
-            self.code = make_code(symbol.value)
+        self.children = []
+        self.recur_children = []
+        self.invalid = invalid
+        self.called_at = []
+        self.symbol = symbol
+        self.code = make_code(None if invalid else symbol.value)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __ne__(self, other):
+        return self.id != other.id
 
     @property
     def cls_name(self):
@@ -69,10 +63,6 @@ class Node(object):
     @property
     def qualname(self):
         return self.symbol.qualname
-
-    @property
-    def decorated_by(self):
-        return self.code.decorated_by
 
     @property
     def filename(self):
@@ -97,31 +87,62 @@ class Node(object):
     def path_to_root(self):
         return NodePath(self)
 
-    def source_line(self, i):
-        return self.code.source_line(i)
+    def source_line(self, fun_lineno=None, file_lineno=None):
+        if fun_lineno is None and file_lineno is None:
+            raise ValueError("The fun_lineno and file_lineno are both None")
+        lineno = file_lineno - self.lineno if fun_lineno is None else fun_lineno
+        return self.code.source_line(lineno)
 
-    def attach(self, child):
-        if child in self.children: return
+    def attach(self, child, where=None):
+        for mychild in self.children:
+            if mychild == child:
+                mychild.mark_called_at(where)
+                return
+        for ancestor in self.path_to_root():
+            if child == ancestor:
+                if child not in self.recur_children:
+                    self.recur_children.append(ancestor)
+                return
         self.children.append(child)
         child.root = self.root
         child.parent = self
+        child.mark_called_at(where)
         return child
 
+    def mark_called_at(self, where):
+        self.called_at.append(where)
+
     def __repr__(self):
-        return "{0}(name={1}, id={2})".format(self.cls_name, self.name, self.id)
+        aux = ""
+        if self.recur_children:
+            rc = list(map(attrgetter("name"), self.recur_children))
+            aux += ", recur_children={0}".format(rc)
+        return "{0}(name={1}, id={2}{3})"\
+               .format(self.cls_name, self.name, self.id, aux)
 
-class RootNode(Node):
-    def __init__(self):
-        super().__init__(None)
-
-    @property
-    def name(self):
-        return "__main__"
+class InvalidNode(Node):
+    def __init__(self, symbol):
+        super().__init__(symbol, invalid=True)
+        self.symbol = symbol
 
     @property
     def id(self):
-        return "__main__"
+        return "invalid:{0}".format(self.name)
+
+    @property
+    def name(self):
+        return self.symbol.name
+
+    @property
+    def qualname(self):
+        return self.symbol.name
+
+    @property
+    def is_opaque(self):
+        return True
 
 def make_node(symbol):
-    return Node(symbol)
+    if symbol and symbol.iscallable():
+        return Node(symbol)
+    return InvalidNode(symbol)
 

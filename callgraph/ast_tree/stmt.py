@@ -12,6 +12,7 @@ from types import FunctionType
 
 from callgraph.ast_tree import Node
 from callgraph.symbols import MultiSymbol, InvalidSymbol, LambdaSymbol
+from callgraph.symbols import make_result_symbol
 from callgraph.ast_tree.helpers import VariablesScope
 
 class ExprNode(Node):
@@ -52,15 +53,13 @@ class CallNode(Node):
             self.local.kwargs[keyword.arg] = keyword.value.load(printer, ctx)
         # TODO(burlog): eval starargs, kwargs
         for obj in self.func.load(printer, ctx).values():
-            if not callable(obj.value): continue
-            printer("- New call discovered:", obj)
+            printer("- New callee discovered:", obj)
             yield obj, self.local.args, self.local.kwargs
 
     def load(self, printer, ctx):
-        symbol = self.func.load(printer, ctx)
-        return MultiSymbol("__returns__", symbol.returns)\
-            or printer("? Can't detect function result:", symbol)\
-            or InvalidSymbol("__returns__")
+        symbol = make_result_symbol(ctx.builder, self.func.load(printer, ctx))
+        if not symbol: printer("? Can't detect callee result:", symbol)
+        return symbol
 
 class NameNode(Node):
     def __init__(self, parent, expr_tree):
@@ -74,11 +73,13 @@ class NameNode(Node):
     def load(self, printer, ctx):
         return ctx.get(self.name)\
             or printer("? Can't load symbol:", self.name)\
-            or InvalidSymbol(self.name)
+            or InvalidSymbol(ctx.builder, self.name)
 
     def store(self, printer, ctx, value):
-        printer("* Storing variable:", self.name + "=" + str(value))
-        ctx.set(self.name, value)
+        if value:
+            printer("* Storing variable:", self.name + "=" + str(value))
+            ctx.set(self.name, value)
+        else: printer("? Can't store variable:", self.name + "=" + str(value))
 
 class AttributeNode(Node):
     def __init__(self, parent, expr_tree):
@@ -95,7 +96,7 @@ class AttributeNode(Node):
         symbol = self.value.load(printer, ctx)
         return symbol.get(self.attr, free=False)\
             or printer("? Can't load attr:", str(symbol) + "." + self.attr)\
-            or InvalidSymbol(str(symbol) + "." + self.attr)
+            or InvalidSymbol(ctx.builder, self.attr)
 
     def store(self, printer, ctx, value):
         symbol = self.value.load(printer, ctx)
@@ -112,7 +113,8 @@ class RaiseNode(Node):
         self.cause = self.make_node(expr_tree.cause)
 
     def eval_node(self, printer, ctx):
-        yield from self.exc.evaluate(printer, ctx)
+        if self.exc:
+            yield from self.exc.evaluate(printer, ctx)
 
 class ReturnNode(Node):
     def __init__(self, parent, expr_tree):
@@ -125,7 +127,7 @@ class ReturnNode(Node):
             symbol = self.value.load(printer, ctx)
             if symbol:
                 printer("* Function can return:", str(symbol))
-                ctx.returns.append(symbol)
+                ctx.can_return(symbol)
 
 class YieldNode(Node):
     def __init__(self, parent, expr_tree):
@@ -138,7 +140,7 @@ class YieldNode(Node):
             symbol = self.value.load(printer, ctx)
             if symbol:
                 printer("* Function can yield:", str(symbol))
-                ctx.returns.append(symbol)
+                ctx.can_yield(symbol)
 
 class YieldFromNode(Node):
     def __init__(self, parent, expr_tree):
@@ -150,8 +152,8 @@ class YieldFromNode(Node):
             yield from self.value.evaluate(printer, ctx)
             symbol = self.value.load(printer, ctx)
             if symbol:
-                printer("* Function can yield:", str(symbol))
-                ctx.returns.append(symbol)
+                printer("* Function can yield from:", str(symbol))
+                ctx.can_yield_from(symbol)
 
 class TryNode(Node):
     def __init__(self, parent, expr_tree):
@@ -189,9 +191,13 @@ class ExceptHandlerNode(Node):
 
     def get_excs_symbols(self, printer, ctx):
         if self.name:
-            if hasattr(self.excs, "unroll"):
-                yield from self.excs.unroll(printer, ctx)
-            yield self.excs.load(printer, ctx)
+            symbol = self.excs.load(printer, ctx)
+            if symbol.isiterable():
+                yield MultiSymbol(ctx.builder, "__unroll__", list(symbol))
+            else: yield self.excs.load(printer, ctx)
+
+    def unroll_iterables(self, printer, ctx, iter_symbol):
+        self.target.store(printer, ctx, symbol)
 
 class AssertNode(Node):
     def __init__(self, parent, expr_tree):
@@ -213,5 +219,5 @@ class LambdaNode(Node):
         while False: yield None
 
     def load(self, printer, ctx):
-        return LambdaSymbol(self.args, self.body)
+        return LambdaSymbol(ctx.builder, self.args, self.body)
 

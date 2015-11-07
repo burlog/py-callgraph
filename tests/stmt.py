@@ -48,16 +48,15 @@ def test_stmt_for_none_and_tuple():
     def fun():
         var_list = ["", ""]
         if None: var_list = None
-        for var1, var2 in var_list:
-            var1.lstrip()
-            var2.rstrip()
+        for var in var_list:
+            var.strip()
 
     builder = CallGraphBuilder()
     root = builder.build(fun)
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.lstrip", "fun.rstrip"]
+    path = ["fun", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
 def test_stmt_for_dict():

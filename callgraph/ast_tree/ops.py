@@ -19,7 +19,7 @@ class InvertNode(UnaryOpBaseNode):
 
 class NotNode(UnaryOpBaseNode):
     def load(self, printer, ctx):
-        return ConstantSymbol(True)
+        return ConstantSymbol(ctx.builder, True)
 
 class UAddNode(UnaryOpBaseNode):
     pass
@@ -139,7 +139,7 @@ class BoolOpNode(Node):
 
     def load(self, printer, ctx):
         symbols = iter(o.load(printer, ctx) for o in self.operands)
-        return MultiSymbol("__boolop__", symbols)
+        return MultiSymbol(ctx.builder, "__boolop__", symbols)
 
 class CompareNode(Node):
     def __init__(self, parent, expr_tree):
@@ -156,5 +156,5 @@ class CompareNode(Node):
             yield from comparator.evaluate(printer, ctx)
 
     def load(self, printer, ctx):
-        return ConstantSymbol(True)
+        return ConstantSymbol(ctx.builder, True)
 

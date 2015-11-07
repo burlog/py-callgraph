@@ -36,3 +36,15 @@ def getsource(code):
             return "".join(lines[:i + leader])
     return "".join(lines)
 
+class AuPair(object):
+    def __init__(self, builder, tot):
+        self.builder = builder
+        self.tot = tot
+
+    def __enter__(self):
+        self.teenager = self.builder.tot
+        self.builder.tot = self.tot
+
+    def __exit__(self, exp_type, exp_value, traceback):
+        self.builder.tot = self.teenager
+

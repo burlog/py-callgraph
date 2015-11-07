@@ -33,7 +33,7 @@ class NameConstantNode(Node):
         self.value = expr_tree.value
 
     def load(self, printer, ctx):
-        return ConstantSymbol(self.value)
+        return ConstantSymbol(ctx.builder, self.value)
 
 class StrNode(Node):
     def __init__(self, parent, expr_tree):
@@ -41,7 +41,7 @@ class StrNode(Node):
         self.value = expr_tree.s
 
     def load(self, printer, ctx):
-        return ConstantSymbol(self.value)
+        return ConstantSymbol(ctx.builder, self.value)
 
 class BytesNode(Node):
     def __init__(self, parent, expr_tree):
@@ -49,7 +49,7 @@ class BytesNode(Node):
         self.value = expr_tree.s
 
     def load(self, printer, ctx):
-        return ConstantSymbol(self.value)
+        return ConstantSymbol(ctx.builder, self.value)
 
 class NumNode(Node):
     def __init__(self, parent, expr_tree):
@@ -57,7 +57,7 @@ class NumNode(Node):
         self.value = expr_tree.n
 
     def load(self, printer, ctx):
-        return ConstantSymbol(self.value)
+        return ConstantSymbol(ctx.builder, self.value)
 
 class TupleNode(Node):
     def __init__(self, parent, expr_tree):
@@ -70,14 +70,11 @@ class TupleNode(Node):
 
     def load(self, printer, ctx):
         values = [value.load(printer, ctx) for value in self.values]
-        return IterableConstantSymbol(tuple, values)
+        return IterableConstantSymbol(ctx.builder, tuple, values)
 
     def store(self, printer, ctx, value):
         for dst, src in zip(self.values, value):
             dst.store(printer, ctx, src)
-
-    def unroll(self, printer, ctx):
-        yield from [value.load(printer, ctx) for value in self.values]
 
 class ListNode(Node):
     def __init__(self, parent, expr_tree):
@@ -90,14 +87,11 @@ class ListNode(Node):
 
     def load(self, printer, ctx):
         values = [value.load(printer, ctx) for value in self.values]
-        return IterableConstantSymbol(list, values)
+        return IterableConstantSymbol(ctx.builder, list, values)
 
     def store(self, printer, ctx, value):
         for dst, src in zip(self.values, value):
             dst.store(printer, ctx, src)
-
-    def unroll(self, printer, ctx):
-        yield from [value.load(printer, ctx) for value in self.values]
 
 class SetNode(Node):
     def __init__(self, parent, expr_tree):
@@ -110,10 +104,7 @@ class SetNode(Node):
 
     def load(self, printer, ctx):
         values = [value.load(printer, ctx) for value in self.values]
-        return IterableConstantSymbol(set, values)
-
-    def unroll(self, printer, ctx):
-        yield from [value.load(printer, ctx) for value in self.values]
+        return IterableConstantSymbol(ctx.builder, set, values)
 
 class DictNode(Node):
     def __init__(self, parent, expr_tree):
@@ -127,17 +118,15 @@ class DictNode(Node):
             yield from value.evaluate(printer, ctx)
 
     def load(self, printer, ctx):
-        return ConstantSymbol(dict(zip(self.keys, self.values)))
-
-    def unroll(self, printer, ctx):
-        yield from [key.load(printer, ctx) for key in self.keys]
+        values = [k.load(printer, ctx) for k in self.keys]
+        return IterableConstantSymbol(ctx.builder, dict, values)
 
 class EllipsisNode(Node):
     def __init__(self, parent, expr_tree):
         super().__init__(parent, expr_tree)
 
     def load(self, printer, ctx):
-        return ConstantSymbol(Ellipsis)
+        return ConstantSymbol(ctx.builder, Ellipsis)
 
 class KeywordNode(Node):
     def __init__(self, parent, expr_tree):
@@ -149,5 +138,5 @@ class KeywordNode(Node):
         yield from self.value.evaluate(printer, ctx)
 
     def load(self, printer, ctx):
-        return ConstantSymbol(self.value)
+        return ConstantSymbol(ctx.builder, self.value)
 

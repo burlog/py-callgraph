@@ -39,7 +39,7 @@ def test_functions_recur():
     builder = CallGraphBuilder()
     root = builder.build(recur)
 
-    path = ["recur", "recur.recur"]
+    path = ["recur"]
     assert list(dfs_node_names(root)) == path
 
 def test_functions_nested():
@@ -72,6 +72,25 @@ def test_functions_stored_fun():
     dump_tree(root, lambda x: x.children)
 
     path = ["fun", "fun.fun1", "fun.fun1.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_functions_return_chain():
+    def fun2():
+        return ""
+
+    def fun1():
+        return fun2()
+
+    def fun():
+        a = fun1()
+        a.strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.fun1", "fun.fun1.fun2", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
 #def test_default_arg():
