@@ -40,6 +40,7 @@ class CallNode(Node):
         self.keywords = self.make_nodes(expr_tree.keywords)
         self.starargs = self.make_node(expr_tree.starargs)
         self.kwargs = self.make_node(expr_tree.kwargs)
+        self.local.callee_symbols = []
         self.local.kwargs = {}
         self.local.args = []
 
@@ -56,24 +57,21 @@ class CallNode(Node):
             callee_symbol = self.expand(printer, ctx, obj_symbol)
             printer("- New callee discovered:", callee_symbol)
             yield callee_symbol, self.local.args, self.local.kwargs
+            self.local.callee_symbols.append(callee_symbol)
 
     def load(self, printer, ctx):
-        callee_symbol = self.func.load(printer, ctx)
+        name = "__callee_result__"
+        callee_symbol = merge_symbols(name, *self.local.callee_symbols)
         result_symbol = make_result_symbol(ctx.builder, callee_symbol)
         if not result_symbol:
             printer("? Can't load callee result:", callee_symbol)
         return result_symbol
 
     def expand(self, printer, ctx, obj_symbol):
-        if not obj_symbol or not isclass(obj_symbol.value):
-            return obj_symbol
-        init_symbol = obj_symbol.get("__init__")
-        if init_symbol:
-            init_symbol.can_return(obj_symbol)
-            init_symbol.myself = obj_symbol
-            return init_symbol
-        printer("? Can't extract __init__:", obj_symbol)
-        return obj_symbol
+        if not obj_symbol or not isclass(obj_symbol.value): return obj_symbol
+        return obj_symbol.make_instance_and_return_init()\
+            or printer("? Can't extract __init__:", obj_symbol)\
+            or obj_symbol
 
 class NameNode(Node):
     def __init__(self, parent, expr_tree):

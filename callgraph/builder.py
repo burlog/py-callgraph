@@ -51,6 +51,7 @@ class CallGraphBuilder(object):
         return dict((k, UnarySymbol(self, k, v)) for k, v in kwargs.items())
 
     def build(self, function, kwargs={}):
+        self.root = None
         self.hooks.clear()
         symbol = UnarySymbol(self, function.__name__, function)
         return self.process(symbol, kwargs=self.make_kwargs_symbols(kwargs))

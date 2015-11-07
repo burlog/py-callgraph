@@ -8,8 +8,8 @@
 #
 
 import os
-from itertools import chain
-from inspect import isclass, isbuiltin
+from itertools import chain, islice
+from inspect import isclass, isbuiltin, getmro
 from abc import ABCMeta, abstractmethod
 
 from callgraph.finder import find_object
@@ -49,6 +49,10 @@ class Symbol(metaclass=ABCMeta):
     def hooks(self):
         return self.builder.hooks
 
+    @property
+    def inst_name(self):
+        return self.name
+
     def returns(self):
         yield from self.return_list
 
@@ -83,17 +87,22 @@ class Symbol(metaclass=ABCMeta):
     def __repr__(self):
         aux = ", ".join(self.aux_repr())
         if aux: aux = ", " + aux
+        if self.myself:
+            aux += ", myself=" + self.myself.inst_name
         if not empty(self.returns()):
             aux += ", returns=["
-            aux += ",".join(map(lambda x: x.name, self.returns())) + "]"
+            aux += ",".join(map(lambda x: x.inst_name, self.returns())) + "]"
         if not empty(self.yields()):
             aux += ", yields=["
-            aux += ",".join(map(lambda x: x.name, self.yields())) + "]"
+            aux += ",".join(map(lambda x: x.inst_name, self.yields())) + "]"
         return "{0}(name={1}{2})".format(self.cls_name, self.name, aux)
 
 class UnarySymbol(Symbol):
     def __init__(self, builder, name, value):
         super().__init__(builder, name)
+        UnarySymbol.counter = 0
+        self.force_myself = None
+        self.class_scope = {}
         self.value = value
 
     @property
@@ -103,14 +112,15 @@ class UnarySymbol(Symbol):
     def values(self):
         yield self
 
-    def get(self, name, free=True):
+    def get(self, name, free=True, nocache=False):
         # cached attributes in symbol scope
         if name in self.scope: return self.scope[name]
+        if name in self.class_scope: return self.class_scope[name]
 
         # attributes of the held value
         if hasattr(self.value, name):
             symbol = UnarySymbol(self.builder, name, getattr(self.value, name))
-            symbol.myself = self
+            symbol.myself = self.force_myself or self
             return self.scope.setdefault(name, symbol)
 
         # global symbols if they are allowed
@@ -118,9 +128,9 @@ class UnarySymbol(Symbol):
         if name in self.builder.global_symbols:
             symbol = self.builder.global_symbols[name]
         else:
-            symbol = find_symbol(self.builder, self.value, name)
+            symbol = find_symbol(self, self.value, name)
         kwargs = {}
-        if symbol: kwargs["value"] = symbol.value
+        if hasattr(symbol, "value"): kwargs["value"] = symbol.value
         self.hooks.global_symbol_load(name=symbol.name, **kwargs)
         return self.scope.setdefault(name, symbol)
 
@@ -133,7 +143,36 @@ class UnarySymbol(Symbol):
                 self.scope[name] = value
                 self.var_names.add(name)
 
+    def make_instance(self):
+        instance_symbol = UnarySymbol(self.builder, self.name, self.value)
+        instance_symbol.class_scope = self.scope
+        instance_symbol.scope = {}
+        instance_symbol.return_list = []
+        instance_symbol.yield_list = []
+        instance_symbol.myself = None
+        instance_symbol.var_names = set()
+        self.counter += 1
+        instance_symbol.instance_id = self.counter
+        return instance_symbol
+
+    def make_instance_and_return_init(self):
+        assert isinstance(self.value, type)
+        instance_symbol = self.make_instance()
+        init = getattr(self.value, "__init__")
+        init_symbol = UnarySymbol(self.builder, "__init__", init)
+        init_symbol.can_return(instance_symbol)
+        init_symbol.myself = instance_symbol
+        return init_symbol
+
+    @property
+    def inst_name(self):
+        if hasattr(self, "instance_id"):
+            return self.name + "{" + str(self.instance_id) + "}"
+        return self.name
+
     def aux_repr(self):
+        if hasattr(self, "instance_id"):
+            yield "instance=" + str(self.instance_id)
         yield "value=" + repr(self.value)
 
 class ConstantSymbol(UnarySymbol):
@@ -154,7 +193,7 @@ class IterableConstantSymbol(ConstantSymbol):
     def aux_repr(self):
         yield from super().aux_repr()
         yield "iterable=[{0}]"\
-              .format(",".join(map(lambda x: x.name, self.iterable)))
+              .format(",".join(map(lambda x: x.inst_name, self.iterable)))
 
 class InvalidSymbol(Symbol):
     def __init__(self, builder, name):
@@ -243,7 +282,7 @@ class MultiSymbol(Symbol):
                 symbol.set(name, value)
 
     def aux_repr(self):
-        names = lambda s: map(lambda x: x.name, s)
+        names = lambda s: map(lambda x: x.inst_name, s)
         yield from super().aux_repr()
         if self.value_list:
             yield "values=[{0}]".format(",".join(names(self.value_list)))
@@ -262,13 +301,35 @@ class MultiSymbol(Symbol):
 
 class ResultSymbol(MultiSymbol):
     def __init__(self, builder, callee_symbol):
-        super().__init__(builder, "__result_of_" + callee_symbol.name + "__",
+        super().__init__(builder,
+                         "__result_of_" + callee_symbol.inst_name + "__",
                          callee_symbol.returns(),
                          callee_symbol.yields())
 
 class BuiltinSymbol(UnarySymbol):
     def __init__(self, builder, obj):
         super().__init__(builder, obj.__name__, obj)
+
+    def set(self, name, value):
+        raise RuntimeError("You can't assing attribute to builtin symbol")
+
+class SuperBuiltinSymbol(MultiSymbol):
+    def __init__(self, parent):
+        assert isinstance(parent.myself, UnarySymbol)
+        assert isinstance(parent, UnarySymbol)
+        assert not hasattr(parent, "instance_id")
+        # TODO(burlog): bound methods?!
+        super().__init__(parent.builder,
+                         "__super_of_" + parent.inst_name + "__",
+                         self.make_super(parent))
+
+    def make_super(self, parent):
+        __super__ = UnarySymbol(parent.builder, "__super__", super.__init__)
+        for cls in getmro(parent.myself.value)[1:-1]:
+            symbol = UnarySymbol(parent.builder, cls.__name__, cls)
+            symbol.force_myself = parent.myself
+            __super__.can_return(symbol)
+        return [__super__]
 
     def set(self, name, value):
         raise RuntimeError("You can't assing attribute to builtin symbol")
@@ -371,25 +432,26 @@ def merge_symbols(name, *args):
     gener_list = list(chain_geners(args))
     return MultiSymbol(args[0].builder, name, value_list, gener_list)
 
-def find_symbol(builder, value, name):
+def find_symbol(parent, value, name):
     obj = find_object(value.__init__ if isclass(value) else value, name)
-    if obj is None: return InvalidSymbol(builder, name)
+    if obj is None: return InvalidSymbol(parent.builder, name)
     if isbuiltin(obj) and not isclass(obj):
-        if obj == open: return OpenBuiltinSymbol(builder)
-        if obj == dir: return DirBuiltinSymbol(builder)
-        if obj == getattr: return GetattrBuiltinSymbol(builder)
-        if obj == hasattr: return HasattrBuiltinSymbol(builder)
-        if obj == isinstance: return IsinstanceBuiltinSymbol(builder)
-        if obj == print: return PrintBuiltinSymbol(builder)
-        if obj == callable: return CallableBuiltinSymbol(builder)
-        if obj == id: return IdBuiltinSymbol(builder)
-        if obj == iter: return IterBuiltinSymbol(builder)
-        if obj == len: return LenBuiltinSymbol(builder)
-        if obj == ord: return OrdBuiltinSymbol(builder)
-        if obj == min: return MinBuiltinSymbol(builder)
-        if obj == max: return MaxBuiltinSymbol(builder)
-        if obj == next: return NextBuiltinSymbol(builder)
-        return InvalidSymbol(builder, name)
+        if obj == open: return OpenBuiltinSymbol(parent.builder)
+        if obj == dir: return DirBuiltinSymbol(parent.builder)
+        if obj == getattr: return GetattrBuiltinSymbol(parent.builder)
+        if obj == hasattr: return HasattrBuiltinSymbol(parent.builder)
+        if obj == isinstance: return IsinstanceBuiltinSymbol(parent.builder)
+        if obj == print: return PrintBuiltinSymbol(parent.builder)
+        if obj == callable: return CallableBuiltinSymbol(parent.builder)
+        if obj == id: return IdBuiltinSymbol(parent.builder)
+        if obj == iter: return IterBuiltinSymbol(parent.builder)
+        if obj == len: return LenBuiltinSymbol(parent.builder)
+        if obj == ord: return OrdBuiltinSymbol(parent.builder)
+        if obj == min: return MinBuiltinSymbol(parent.builder)
+        if obj == max: return MaxBuiltinSymbol(parent.builder)
+        if obj == next: return NextBuiltinSymbol(parent.builder)
+        return InvalidSymbol(parent.builder, name)
         #raise NotImplementedError("Unknown builtin symbol: " + name)
-    return UnarySymbol(builder, name, obj)
+    if obj == super: return SuperBuiltinSymbol(parent)
+    return UnarySymbol(parent.builder, name, obj)
 

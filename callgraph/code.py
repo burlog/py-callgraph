@@ -148,6 +148,8 @@ def make_code(obj):
     if "__code__" in dir(obj):
         return TransparentCode(obj)
     if "__self__" in dir(obj):
+        if "__func__" in dir(obj):
+            return TransparentCode(obj.__func__)
         if "__class__" in dir(obj.__self__):
             return OpaqueMethodCode(obj)
     if "__objclass__" in dir(obj):

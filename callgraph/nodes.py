@@ -93,26 +93,27 @@ class Node(object):
         return self.code.source_line(lineno)
 
     def attach(self, child, where=None):
-        # don't attach same child twice
-        for mychild in self.children:
-            if mychild == child:
-                mychild.mark_called_at(where)
-                return
-
         # handle recurrent calls
         for ancestor in self.path_to_root():
             if child == ancestor:
                 if child not in self.recur_children:
                     self.recur_children.append(ancestor)
                 ancestor.mark_called_at(where)
-                return
+                return False
 
-        # just append
-        self.children.append(child)
+        # don't attach same child twice but share children between nodes
+        for my_child in self.children:
+            if my_child == child:
+                child.children = my_child.children
+                my_child.mark_called_at(where)
+                break
+        else: self.children.append(child)
+
+        # update nodes 
         child.root = self.root
         child.parent = self
         child.mark_called_at(where)
-        return child
+        return True
 
     def mark_called_at(self, where):
         self.called_at.append(where)
