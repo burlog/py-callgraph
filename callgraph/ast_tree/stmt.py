@@ -8,11 +8,11 @@
 #
 
 import ast
-from types import FunctionType
+from inspect import isclass
 
 from callgraph.ast_tree import Node
 from callgraph.symbols import MultiSymbol, InvalidSymbol, LambdaSymbol
-from callgraph.symbols import make_result_symbol
+from callgraph.symbols import make_result_symbol, merge_symbols
 from callgraph.ast_tree.helpers import VariablesScope
 
 class ExprNode(Node):
@@ -52,14 +52,28 @@ class CallNode(Node):
             yield from keyword.evaluate(printer, ctx)
             self.local.kwargs[keyword.arg] = keyword.value.load(printer, ctx)
         # TODO(burlog): eval starargs, kwargs
-        for obj in self.func.load(printer, ctx).values():
-            printer("- New callee discovered:", obj)
-            yield obj, self.local.args, self.local.kwargs
+        for obj_symbol in self.func.load(printer, ctx).values():
+            callee_symbol = self.expand(printer, ctx, obj_symbol)
+            printer("- New callee discovered:", callee_symbol)
+            yield callee_symbol, self.local.args, self.local.kwargs
 
     def load(self, printer, ctx):
-        symbol = make_result_symbol(ctx.builder, self.func.load(printer, ctx))
-        if not symbol: printer("? Can't detect callee result:", symbol)
-        return symbol
+        callee_symbol = self.func.load(printer, ctx)
+        result_symbol = make_result_symbol(ctx.builder, callee_symbol)
+        if not result_symbol:
+            printer("? Can't load callee result:", callee_symbol)
+        return result_symbol
+
+    def expand(self, printer, ctx, obj_symbol):
+        if not obj_symbol or not isclass(obj_symbol.value):
+            return obj_symbol
+        init_symbol = obj_symbol.get("__init__")
+        if init_symbol:
+            init_symbol.can_return(obj_symbol)
+            init_symbol.myself = obj_symbol
+            return init_symbol
+        printer("? Can't extract __init__:", obj_symbol)
+        return obj_symbol
 
 class NameNode(Node):
     def __init__(self, parent, expr_tree):

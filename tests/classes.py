@@ -66,6 +66,6 @@ def test_classes_base_class():
     from callgraph.indent_printer import dump_tree
     dump_tree(root, lambda x: x.children)
 
-    path = ["fun", "fun.B", "fun.method_a", "fun.method_b"]
+    path = ["fun", "fun.object", "fun.method_a", "fun.method_b"]
     assert list(dfs_node_names(root)) == path
 

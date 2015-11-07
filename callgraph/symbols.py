@@ -13,14 +13,15 @@ from inspect import isclass, isbuiltin
 from abc import ABCMeta, abstractmethod
 
 from callgraph.finder import find_object
+from callgraph.utils import empty
 
 class Symbol(metaclass=ABCMeta):
     def __init__(self, builder, name):
         self.builder = builder
         self.name = name
         self.scope = {}
-        self.returns = []
-        self.yields = []
+        self.return_list = []
+        self.yield_list = []
         self.myself = None
         self.var_names = set()
 
@@ -48,6 +49,12 @@ class Symbol(metaclass=ABCMeta):
     def hooks(self):
         return self.builder.hooks
 
+    def returns(self):
+        yield from self.return_list
+
+    def yields(self):
+        yield from self.yield_list
+
     def geners(self):
         while False: yield None
 
@@ -64,33 +71,30 @@ class Symbol(metaclass=ABCMeta):
         return True
 
     def can_return(self, symbol):
-        self.returns.extend(symbol.values())
-        self.yields.extend(symbol.geners())
+        self.return_list.extend(symbol.values())
+        self.yield_list.extend(symbol.geners())
 
     def can_yield(self, symbol):
-        self.yields.extend(symbol.values())
+        self.yield_list.extend(symbol.values())
 
     def can_yield_from(self, symbol):
-        self.yields.extend(symbol.geners())
+        self.yield_list.extend(symbol.geners())
 
     def __repr__(self):
         aux = ", ".join(self.aux_repr())
         if aux: aux = ", " + aux
-        if self.returns:
+        if not empty(self.returns()):
             aux += ", returns=["
-            aux += ",".join(map(lambda x: x.name, self.returns)) + "]"
-        if self.yields:
+            aux += ",".join(map(lambda x: x.name, self.returns())) + "]"
+        if not empty(self.yields()):
             aux += ", yields=["
-            aux += ",".join(map(lambda x: x.name, self.yields)) + "]"
+            aux += ",".join(map(lambda x: x.name, self.yields())) + "]"
         return "{0}(name={1}{2})".format(self.cls_name, self.name, aux)
 
 class UnarySymbol(Symbol):
     def __init__(self, builder, name, value):
         super().__init__(builder, name)
         self.value = value
-        if isclass(self.value):
-            self.can_return(self)
-            self.myself = self
 
     @property
     def qualname(self):
@@ -124,8 +128,7 @@ class UnarySymbol(Symbol):
         assert isinstance(value, Symbol)
         if value:
             if name in self.scope:
-                value_list = list(chain(self.scope[name].values(), [value]))
-                self.scope[name] = MultiSymbol(self.builder, name, value_list)
+                self.scope[name] = merge_symbols(name, self.scope[name], value)
             else:
                 self.scope[name] = value
                 self.var_names.add(name)
@@ -195,7 +198,7 @@ class LambdaSymbol(Symbol):
         while True: yield self
 
 class MultiSymbol(Symbol):
-    def __init__(self, builder, name, value_list, gener_list=[]):
+    def __init__(self, builder, name, value_list=[], gener_list=[]):
         super().__init__(builder, name)
         self.value_list = list(value_list)
         self.gener_list = list(gener_list)
@@ -212,10 +215,18 @@ class MultiSymbol(Symbol):
         for value in self.gener_list:
             yield from value.values()
 
+    def returns(self):
+        for value in self.values():
+            yield from value.returns()
+
+    def yields(self):
+        for value in self.values():
+            yield from value.yields()
+
     def get(self, name, free=True):
         def list_values(attr_symbol):
             yield from iter(x.value for x in attr_symbol.value_list)
-        attr_symbol = MultiSymbol(self.builder, name, [])
+        attr_symbol = MultiSymbol(self.builder, name)
         for symbol in filter(None, self.values()):
             assert not isinstance(symbol, MultiSymbol)
             attr = symbol.get(name, free)
@@ -223,8 +234,6 @@ class MultiSymbol(Symbol):
             for sub_attr in attr.values():
                 if sub_attr.value not in list_values(attr_symbol):
                     attr_symbol.value_list.append(sub_attr)
-                    attr_symbol.returns.extend(sub_attr.returns)
-                    attr_symbol.yields.extend(sub_attr.yields)
         return attr_symbol
 
     def set(self, name, value):
@@ -242,13 +251,11 @@ class MultiSymbol(Symbol):
             yield "geners=[{0}]".format(",".join(names(self.gener_list)))
 
     def __iter__(self):
+        # TODO(burlog): and what about geners?
+        # for a in [generator()]: for b in a: ...?
         only_iterable = filter(lambda x: x.isiterable(), self.values())
         for symbols in zip(*[symbol for symbol in only_iterable]):
-            iter_symbol = MultiSymbol(self.builder, self.name, symbols)
-            for symbol in symbols:
-                iter_symbol.returns.extend(symbol.returns)
-                iter_symbol.yields.extend(symbol.yields)
-            yield iter_symbol
+            yield MultiSymbol(self.builder, self.name, symbols)
 
     def __bool__(self):
         return bool(self.value_list or self.gener_list)
@@ -256,12 +263,8 @@ class MultiSymbol(Symbol):
 class ResultSymbol(MultiSymbol):
     def __init__(self, builder, callee_symbol):
         super().__init__(builder, "__result_of_" + callee_symbol.name + "__",
-                         callee_symbol.returns,
-                         callee_symbol.yields)
-
-def make_result_symbol(builder, callee_symbol):
-    return ResultSymbol(builder, callee_symbol)\
-        or InvalidSymbol(builder, "__result__")
+                         callee_symbol.returns(),
+                         callee_symbol.yields())
 
 class BuiltinSymbol(UnarySymbol):
     def __init__(self, builder, obj):
@@ -344,6 +347,29 @@ class NextBuiltinSymbol(BuiltinSymbol):
     def __init__(self, builder):
         super().__init__(builder, next)
         # TODO(burlog): we can guess types...
+
+def make_result_symbol(builder, callee_symbol):
+    def expand_ctors(origin_symbol):
+        for symbol in origin_symbol.values():
+            if not symbol or not isclass(symbol.value):
+                yield symbol
+            else:
+                yield symbol.get("__init__")
+    symbols = list(expand_ctors(callee_symbol))
+    result_symbol = merge_symbols(callee_symbol.name, *symbols)
+    return ResultSymbol(builder, result_symbol)\
+        or InvalidSymbol(builder, "__result__")
+
+def merge_symbols(name, *args):
+    def chain_values(symbols):
+        for symbol in symbols:
+            yield from symbol.values()
+    def chain_geners(symbols):
+        for symbol in symbols:
+            yield from symbol.geners()
+    value_list = list(chain_values(args))
+    gener_list = list(chain_geners(args))
+    return MultiSymbol(args[0].builder, name, value_list, gener_list)
 
 def find_symbol(builder, value, name):
     obj = find_object(value.__init__ if isclass(value) else value, name)

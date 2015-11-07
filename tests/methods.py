@@ -106,10 +106,16 @@ def test_methods_class_change():
 
 def test_methods_methods_mismatch():
     class A(object):
+        def __init__(self):
+            pass
+
         def f(self):
             return ""
 
     class B(object):
+        def __init__(self):
+            pass
+
         def f(self):
             return []
 
@@ -145,6 +151,27 @@ def test_methods_self_init():
     dump_tree(root, lambda x: x.children)
 
     path = ["fun", "fun.A", "fun.A.method", "fun.A.method.other_method"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_from_var():
+    def fun():
+        class A(object):
+            def __init__(self):
+                pass
+
+            def method(self):
+                pass
+
+        a = A()
+        b = a.method
+        b()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.method"]
     assert list(dfs_node_names(root)) == path
 
 def test_methods_self_with_params():
@@ -228,5 +255,110 @@ def test_methods_missing():
 
     path = ["fun", "fun.A", "fun.B", "fun.method_b", "fun.method_b.rstrip",
             "fun.method_b", "fun.method_b.lstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_str():
+    def fun():
+        a = str()
+        a.strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.object", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_two_ctors_and_one_method():
+    def fun():
+        class B(object):
+            def __init__(self):
+                pass
+
+            def method(self):
+                "".lstrip()
+
+        class A(object):
+            def __init__(self):
+                pass
+
+            def method(self):
+                "".rstrip()
+
+        a = A() if None else B()
+        a.method()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.B", "fun.method", "fun.method.rstrip",
+            "fun.method", "fun.method.lstrip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_two_ctors_and_two_methods():
+    class A(object):
+        def __init__(self):
+            pass
+
+        def f(self):
+            return ""
+
+    class B(object):
+        def __init__(self):
+            pass
+
+        def f(self):
+            return []
+
+    def fun():
+        a = A() if None else B()
+        a.f().strip()
+        a.f().sort()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path =  ["fun", "fun.A", "fun.B", "fun.f", "fun.f", "fun.strip", "fun.sort"]
+    assert list(dfs_node_names(root)) == path
+
+def test_methods_two_ctors_and_method_and_ctor():
+    class A(object):
+        def __init__(self):
+            pass
+
+        def f(self):
+            return ""
+
+    class B(object):
+        def __init__(self):
+            pass
+
+        def f(self):
+            return C
+
+    class C(object):
+        def __init__(self):
+            pass
+
+        def f(self):
+            return []
+
+    def fun():
+        a = A() if None else B()
+        a.f().strip()
+        a.f()().f().sort()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.A", "fun.B", "fun.f", "fun.f", "fun.strip", "fun.C",
+            "fun.f", "fun.sort"]
     assert list(dfs_node_names(root)) == path
 

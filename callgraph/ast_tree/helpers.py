@@ -34,8 +34,3 @@ class UniqueNameGenerator(object):
         UniqueNameGenerator.counter += 1
         return "{0}_{1}".format(prefix, UniqueNameGenerator.counter)
 
-def empty(iterable):
-    for _ in iterable:
-        return False
-    else: return True
-

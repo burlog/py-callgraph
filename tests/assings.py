@@ -116,6 +116,9 @@ def test_assigns_assign_from_fun_str():
 
 def test_assigns_assign_from_fun_obj():
     class A(object):
+        def __init__(self):
+            pass
+
         def method(self):
             pass
 
@@ -136,6 +139,9 @@ def test_assigns_assign_from_fun_obj():
 
 def test_assigns_assign_from_fun_var():
     class A(object):
+        def __init__(self):
+            pass
+
         def method(self):
             pass
 
@@ -170,10 +176,16 @@ def test_assigns_cond():
 
 def test_assigns_attr_chain_call():
     class A(object):
+        def __init__(self):
+            pass
+
         def f(self):
             return B()
 
     class B(object):
+        def __init__(self):
+            pass
+
         def method(self):
             pass
 

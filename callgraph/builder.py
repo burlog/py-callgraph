@@ -82,20 +82,13 @@ class CallGraphBuilder(object):
                 self.process(callee, node, args.copy(), kwargs.copy())
 
     def inject_arguments(self, printer, node, args, kwargs):
-        # TODO(burlog): fix __init__ rubbish
-        function = node.symbol.value.__init__ \
-                if isclass(node.symbol.value) else node.symbol.value
-        # TODO(burlog): fix __lambda__ objects
-        import ast
-        if isinstance(function, ast.AST): return
         # TODO(burlog): fix starargs, kwstarargs
-
-        # insert self if there is one
-        sig = signature(function)
+        sig = signature(node.symbol.value)
         for p in sig.parameters.values():
             import inspect
             if p.kind != inspect.Parameter.POSITIONAL_OR_KEYWORD:
                 return
+        # inject self if there is one
         if node.symbol.myself and sig.parameters:
             # TODO(burlog): better bound mehtod detection
             if next(iter(sig.parameters.keys())) == "self":

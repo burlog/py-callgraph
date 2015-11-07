@@ -10,11 +10,12 @@
 import ast
 from itertools import chain
 
+from callgraph.utils import empty
+from callgraph.symbols import MultiSymbol, InvalidSymbol
+from callgraph.symbols import make_result_symbol, merge_symbols
 from callgraph.ast_tree import Node
-from callgraph.symbols import MultiSymbol, InvalidSymbol, make_result_symbol
 from callgraph.ast_tree.helpers import VariablesScope
 from callgraph.ast_tree.helpers import UniqueNameGenerator
-from callgraph.ast_tree.helpers import empty
 
 class IfNode(Node):
     def __init__(self, parent, expr_tree):
@@ -46,9 +47,7 @@ class IfExpNode(Node):
         if not self.orelse: return self.body.load(printer, ctx)
         body = self.body.load(printer, ctx)
         orelse = self.orelse.load(printer, ctx)
-        values = chain(body.values(), orelse.values())
-        geners = chain(body.geners(), orelse.geners())
-        return MultiSymbol(ctx.builder, "__if__", values, geners)
+        return merge_symbols("__if__", body, orelse)
 
 class ForNode(Node):
     def __init__(self, parent, expr_tree):

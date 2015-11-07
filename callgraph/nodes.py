@@ -57,7 +57,6 @@ class Node(object):
     @property
     def name(self):
         if self.code.is_opaque: return self.symbol.name
-        if self.code.ast.name == "__init__": return self.symbol.name
         return self.code.ast.name
 
     @property
@@ -94,15 +93,21 @@ class Node(object):
         return self.code.source_line(lineno)
 
     def attach(self, child, where=None):
+        # don't attach same child twice
         for mychild in self.children:
             if mychild == child:
                 mychild.mark_called_at(where)
                 return
+
+        # handle recurrent calls
         for ancestor in self.path_to_root():
             if child == ancestor:
                 if child not in self.recur_children:
                     self.recur_children.append(ancestor)
+                ancestor.mark_called_at(where)
                 return
+
+        # just append
         self.children.append(child)
         child.root = self.root
         child.parent = self

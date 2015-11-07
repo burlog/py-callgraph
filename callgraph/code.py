@@ -123,7 +123,7 @@ class OpaqueFunctionCode(OpaqueCode):
                .format(self.obj.__name__)
 
 class OpaqueSlotCode(OpaqueCode):
-    def __init__(self, obj, aux_name):
+    def __init__(self, obj, aux_name=""):
         super().__init__(obj)
         self.aux_name = aux_name
 
@@ -141,19 +141,17 @@ class InvalidCode(OpaqueCode):
 
     @property
     def id(self):
-        return "python:{0}"\
+        return "invalid:{0}"\
                .format(self.obj)
 
-def make_code(obj, aux_name=""):
+def make_code(obj):
     if "__code__" in dir(obj):
         return TransparentCode(obj)
     if "__self__" in dir(obj):
         if "__class__" in dir(obj.__self__):
             return OpaqueMethodCode(obj)
     if "__objclass__" in dir(obj):
-        return OpaqueSlotCode(obj, aux_name)
-    if isclass(obj):
-        return make_code(obj.__init__, aux_name=obj.__qualname__)
+        return OpaqueSlotCode(obj)
     if isbuiltin(obj): return OpaqueFunctionCode(obj)
     if isinstance(obj, ast.AST): return LambdaCode(obj)
     # TODO(burlog): __call__ and OpaqueFunctionCode is hack

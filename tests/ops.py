@@ -28,6 +28,9 @@ def test_ops_not():
 
 def test_ops_un_add():
     class Int(int):
+        def __init__(self):
+            pass
+
         def __pos__(self):
             return self
 

@@ -8,7 +8,7 @@
 #
 
 from callgraph.ast_tree import Node
-from callgraph.symbols import ConstantSymbol, MultiSymbol
+from callgraph.symbols import ConstantSymbol, merge_symbols
 
 class UnaryOpBaseNode(Node):
     def load(self, printer, ctx):
@@ -138,8 +138,8 @@ class BoolOpNode(Node):
             yield from operand.evaluate(printer, ctx)
 
     def load(self, printer, ctx):
-        symbols = iter(o.load(printer, ctx) for o in self.operands)
-        return MultiSymbol(ctx.builder, "__boolop__", symbols)
+        symbols = list(o.load(printer, ctx) for o in self.operands)
+        return merge_symbols("__boolop__", *symbols)
 
 class CompareNode(Node):
     def __init__(self, parent, expr_tree):

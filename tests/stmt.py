@@ -115,6 +115,9 @@ def test_stmt_with_opaque():
 
 def test_stmt_with_single():
     class A(object):
+        def __init__(self):
+            pass
+
         def __enter__(self):
             b = ""
             b.find()
@@ -138,6 +141,9 @@ def test_stmt_with_single():
 
 def test_stmt_with_pair():
     class A(object):
+        def __init__(self):
+            pass
+
         def __enter__(self):
             b = ""
             b.find()
@@ -147,6 +153,9 @@ def test_stmt_with_pair():
             c.index()
 
     class B(object):
+        def __init__(self):
+            pass
+
         def __enter__(self):
             b = 3
             b.to_bytes(1, "big")
@@ -173,6 +182,9 @@ def test_stmt_with_pair():
 
 def test_stmt_with_tuple():
     class A():
+        def __init__(self):
+            pass
+
         def __enter__(self):
             return 1, ""
         def __exit__(self, t, v, tb):

@@ -38,6 +38,8 @@ def test_functions_recur():
 
     builder = CallGraphBuilder()
     root = builder.build(recur)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
 
     path = ["recur"]
     assert list(dfs_node_names(root)) == path

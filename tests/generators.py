@@ -29,6 +29,24 @@ def test_generators_simple():
     path = ["fun", "fun.generator", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
+def test_generators_multi():
+    def generator():
+        yield ""
+
+    def fun():
+        a = generator()
+        if None: a = None
+        for entry in a:
+            entry.strip()
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.generator", "fun.strip"]
+    assert list(dfs_node_names(root)) == path
+
 def test_generators_explode():
     def generator():
         yield "", 1
@@ -62,7 +80,7 @@ def test_generators_with_param():
     path = ["fun", "fun.generator", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-def test_generators_multi():
+def test_generators_two_yields():
     def generator():
         yield ""
         yield 3
@@ -101,6 +119,9 @@ def test_generators_yield_from():
 
 def test_generators_object_yield():
     class A(object):
+        def __init__(self):
+            pass
+
         def __iter__(self):
             yield ""
 
@@ -118,6 +139,9 @@ def test_generators_object_yield():
 
 def test_generators_object_next():
     class A(object):
+        def __init__(self):
+            pass
+
         def __iter__(self):
             return self
 
@@ -155,6 +179,9 @@ def test_generators_from_gener_var():
 
 def test_generators_from_obj_var():
     class A(object):
+        def __init__(self):
+            pass
+
         def __iter__(self):
             return self
 
@@ -176,10 +203,16 @@ def test_generators_from_obj_var():
 
 def test_generators_from_two_obj():
     class B(object):
+        def __init__(self):
+            pass
+
         def __next__(self):
             return ""
 
     class A(object):
+        def __init__(self):
+            pass
+
         def __iter__(self):
             return B()
 
@@ -243,6 +276,9 @@ def test_generators_from_obj_and_gener():
         yield ""
 
     class A(object):
+        def __init__(self):
+            pass
+
         def __iter__(self):
             return generator() if None else 3
 

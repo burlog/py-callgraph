@@ -48,3 +48,8 @@ class AuPair(object):
     def __exit__(self, exp_type, exp_value, traceback):
         self.builder.tot = self.teenager
 
+def empty(iterable):
+    for _ in iterable:
+        return False
+    else: return True
+
