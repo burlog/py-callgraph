@@ -20,7 +20,7 @@ class FunctionDefNode(Node):
         # TODO(burlog): filename, calls from defaults, ...
 
     def eval_node(self, printer, ctx):
-        printer("- Skiping function definition:", self.name)
+        printer("- Skipping function definition:", self.name)
         while False: yield None
 
 class ClassDefNode(Node):

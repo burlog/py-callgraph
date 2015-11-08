@@ -29,7 +29,7 @@ def test_stmt_call_none():
 def test_stmt_for_tuple():
     def fun1():
         for var in ("", 1):
-            var.to_bytes()
+            var.to_bytes(1, "big")
 
     def fun():
         for var in ["", 1]:
@@ -76,7 +76,7 @@ def test_stmt_while():
     def fun():
         a = 1
         while "".strip():
-            a.to_bytes(1, "bug")
+            a.to_bytes(1, "big")
 
     builder = CallGraphBuilder()
     root = builder.build(fun)

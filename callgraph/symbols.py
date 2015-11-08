@@ -71,6 +71,9 @@ class Symbol(metaclass=ABCMeta):
     def isiterable(self):
         return "__iter__" in dir(self)
 
+    def ismapping(self):
+        return "__iter_items__" in dir(self)
+
     def __bool__(self):
         return True
 
@@ -195,6 +198,14 @@ class IterableConstantSymbol(ConstantSymbol):
         yield "iterable=[{0}]"\
               .format(",".join(map(lambda x: x.inst_name, self.iterable)))
 
+class MappingConstantSymbol(IterableConstantSymbol):
+    def __init__(self, builder, cls, keys, values):
+        super().__init__(builder, cls, keys)
+        self.iterable_values = values
+
+    def __iter_items__(self):
+        yield from zip(self.iterable, self.iterable_values)
+
 class InvalidSymbol(Symbol):
     def __init__(self, builder, name):
         super().__init__(builder, name)
@@ -296,8 +307,28 @@ class MultiSymbol(Symbol):
         for symbols in zip(*[symbol for symbol in only_iterable]):
             yield MultiSymbol(self.builder, self.name, symbols)
 
+    def __iter_items__(self):
+        result = {}
+        for mapping_symbol in filter(lambda x: x.ismapping(), self.values()):
+            for key_symbol, value_symbol in mapping_symbol.__iter_items__():
+                for key in key_symbol.values():
+                    if key.value in result:
+                        name = "__iter_items_multi__"
+                        origin = result[key.value][1]
+                        multi_value = merge_symbols(name, origin, value_symbol)
+                        result[key.value] = key, multi_value
+                    else:
+                        result[key.value] = key, value_symbol
+        yield from result.values()
+
     def __bool__(self):
         return bool(self.value_list or self.gener_list)
+
+    def isiterable(self):
+        return any(map(lambda x: x.isiterable(), self.values()))
+
+    def ismapping(self):
+        return any(map(lambda x: x.ismapping(), self.values()))
 
 class ResultSymbol(MultiSymbol):
     def __init__(self, builder, callee_symbol):

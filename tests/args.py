@@ -63,8 +63,7 @@ def test_args_from_return():
     path = ["fun", "fun.fun2", "fun.fun1", "fun.fun1.strip"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="explode tuple result values")
-def test_args_stararg():
+def test_args_stararg_simple():
     def fun1(a):
         a.strip()
 
@@ -80,13 +79,49 @@ def test_args_stararg():
     path = ["fun", "fun.fun1", "fun.fun1.strip"]
     assert list(dfs_node_names(root)) == path
 
-@pytest.mark.skipif(True, reason="explode dict result values")
-def test_args_starkwarg():
+def test_args_stararg_from_call():
+    def fun2():
+        return [""]
+
     def fun1(a):
         a.strip()
 
     def fun():
-        a = {a: ""}
+        fun1(*fun2())
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.fun2", "fun.fun1", "fun.fun1.strip"]
+    assert list(dfs_node_names(root)) == path
+
+@pytest.mark.skipif(True, reason="static list/tuple implementation")
+def test_args_stararg_opaque():
+    def fun1(a):
+        a.strip()
+
+    def fun():
+        b = list("")
+        for a in []:
+            b.append(a)
+        fun1(*b)
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.list", "fun.append", "fun.fun1", "fun.fun1.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_args_starkwarg_simple():
+    def fun1(a):
+        a.strip()
+
+    def fun():
+        a = {"a": ""}
         fun1(**a)
 
     builder = CallGraphBuilder()
@@ -95,5 +130,27 @@ def test_args_starkwarg():
     dump_tree(root, lambda x: x.children)
 
     path = ["fun", "fun.fun1", "fun.fun1.strip"]
+    assert list(dfs_node_names(root)) == path
+
+def test_args_starkwarg_from_call():
+    def fun2():
+        return {"a": "1"}
+        return {"b": "2"}
+        return {"c": "3"}
+        return {"a": 4}
+
+    def fun1(a):
+        a.strip()
+        return a
+
+    def fun():
+        fun1(**fun2()).to_bytes(1, "big")
+
+    builder = CallGraphBuilder()
+    root = builder.build(fun)
+    from callgraph.indent_printer import dump_tree
+    dump_tree(root, lambda x: x.children)
+
+    path = ["fun", "fun.fun2", "fun.fun1", "fun.fun1.strip", "fun.to_bytes"]
     assert list(dfs_node_names(root)) == path
 

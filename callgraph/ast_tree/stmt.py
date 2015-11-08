@@ -46,13 +46,8 @@ class CallNode(Node):
 
     def eval_node(self, printer, ctx):
         yield from self.func.evaluate(printer, ctx)
-        for arg in self.args:
-            yield from arg.evaluate(printer, ctx)
-            self.local.args.append(arg.load(printer, ctx))
-        for keyword in self.keywords:
-            yield from keyword.evaluate(printer, ctx)
-            self.local.kwargs[keyword.arg] = keyword.value.load(printer, ctx)
-        # TODO(burlog): eval starargs, kwargs
+        yield from self.unroll_args(printer, ctx)
+        yield from self.unroll_kwargs(printer, ctx)
         for obj_symbol in self.func.load(printer, ctx).values():
             callee_symbol = self.expand(printer, ctx, obj_symbol)
             printer("- New callee discovered:", callee_symbol)
@@ -60,7 +55,8 @@ class CallNode(Node):
             self.local.callee_symbols.append(callee_symbol)
 
     def load(self, printer, ctx):
-        name = "__callee_result__"
+        if not self.local.callee_symbols: name = "__callee_result__"
+        else: name = self.local.callee_symbols[0].name
         callee_symbol = merge_symbols(name, *self.local.callee_symbols)
         result_symbol = make_result_symbol(ctx.builder, callee_symbol)
         if not result_symbol:
@@ -72,6 +68,34 @@ class CallNode(Node):
         return obj_symbol.make_instance_and_return_init()\
             or printer("? Can't extract __init__:", obj_symbol)\
             or obj_symbol
+
+    def unroll_args(self, printer, ctx):
+        for arg in self.args:
+            yield from arg.evaluate(printer, ctx)
+            self.local.args.append(arg.load(printer, ctx))
+        if self.starargs:
+            yield from self.starargs.evaluate(printer, ctx)
+            starargs = self.starargs.load(printer, ctx)
+            if starargs.isiterable():
+                for stararg in starargs:
+                    self.local.args.append(stararg)
+            else: printer("? Can't unroll *args:", starargs)
+
+    def unroll_kwargs(self, printer, ctx):
+        for keyword in self.keywords:
+            yield from keyword.evaluate(printer, ctx)
+            self.local.kwargs[keyword.arg] = keyword.value.load(printer, ctx)
+        if self.kwargs:
+            yield from self.kwargs.evaluate(printer, ctx)
+            kwargs = self.kwargs.load(printer, ctx)
+            if kwargs.ismapping():
+                for key_symbol, value_symbol in kwargs.__iter_items__():
+                    for key in key_symbol.values():
+                        if isinstance(key.value, str):
+                            self.local.kwargs[key.value] = value_symbol
+                            continue
+                        printer("? Skipping dynamic subscription:", key_symbol)
+            else: printer("? Can't unroll **kwargs:", kwargs)
 
 class NameNode(Node):
     def __init__(self, parent, expr_tree):

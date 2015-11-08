@@ -115,7 +115,7 @@ class UnknownNode(Node):
         self._fields.append("ast_name")
 
     def evaluate(self, printer, ctx):
-        printer("! Skiping unknown ast node:", self)
+        printer("! Skipping unknown ast node:", self)
         while False: yield None
 
 class LoadNode(Node):

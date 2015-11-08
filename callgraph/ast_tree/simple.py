@@ -8,7 +8,9 @@
 #
 
 from callgraph.ast_tree import Node
-from callgraph.symbols import ConstantSymbol, IterableConstantSymbol
+from callgraph.symbols import ConstantSymbol
+from callgraph.symbols import IterableConstantSymbol
+from callgraph.symbols import MappingConstantSymbol
 
 class PassNode(Node):
     pass
@@ -118,8 +120,9 @@ class DictNode(Node):
             yield from value.evaluate(printer, ctx)
 
     def load(self, printer, ctx):
-        values = [k.load(printer, ctx) for k in self.keys]
-        return IterableConstantSymbol(ctx.builder, dict, values)
+        keys = [k.load(printer, ctx) for k in self.keys]
+        values = [v.load(printer, ctx) for v in self.values]
+        return MappingConstantSymbol(ctx.builder, dict, keys, values)
 
 class EllipsisNode(Node):
     def __init__(self, parent, expr_tree):
