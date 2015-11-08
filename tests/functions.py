@@ -95,31 +95,3 @@ def test_functions_return_chain():
     path = ["fun", "fun.fun1", "fun.fun1.fun2", "fun.strip"]
     assert list(dfs_node_names(root)) == path
 
-#def test_default_arg():
-#    def func_def(x=None, e=error_1):
-#        if x: raise e
-#    res = zip(*gather_symbols(func_def, matcher_re.match))[0]
-#    assert res == ("error_1", )
-#
-#@pytest.mark.skipif(True, reason="TODO")
-#def test_default_arg_func():
-#    def arg():
-#        return error_1
-#    def func_def(x=None, e=arg()):
-#        if x: raise e
-#    res = zip(*gather_symbols(func_def, matcher_re.match))[0]
-#    assert res == ("error_1", )
-#
-#@pytest.mark.skipif(True, reason="TODO")
-#def test_gener():
-#    def gener():
-#        yield error_1
-#    res = zip(*gather_symbols(gener, matcher_re.match))[0]
-#    assert res == ("error_1", )
-#
-#    def for_with_gener():
-#        for a in  gener():
-#            raise error_2
-#    res = zip(*gather_symbols(for_with_gener, matcher_re.match))[0]
-#    assert res == ("error_1", "error_2")
-

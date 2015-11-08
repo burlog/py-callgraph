@@ -55,13 +55,15 @@ class CallNode(Node):
             self.local.callee_symbols.append(callee_symbol)
 
     def load(self, printer, ctx):
-        if not self.local.callee_symbols: name = "__callee_result__"
-        else: name = self.local.callee_symbols[0].name
-        callee_symbol = merge_symbols(name, *self.local.callee_symbols)
+        callee_symbol = merge_symbols(self.nick(), *self.local.callee_symbols)
         result_symbol = make_result_symbol(ctx.builder, callee_symbol)
         if not result_symbol:
             printer("? Can't load callee result:", callee_symbol)
         return result_symbol
+
+    def nick(self):
+        if not self.local.callee_symbols: return "__callee_result__"
+        return "_or_".join(map(lambda x: x.name, self.local.callee_symbols))
 
     def expand(self, printer, ctx, obj_symbol):
         if not obj_symbol or not isclass(obj_symbol.value): return obj_symbol

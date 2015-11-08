@@ -12,7 +12,8 @@ from inspect import signature
 
 from callgraph.hooks import Hooks
 from callgraph.utils import AuPair
-from callgraph.symbols import UnarySymbol
+from callgraph.symbols import Symbol, UnarySymbol
+from callgraph.symbols import IterableConstantSymbol, MappingConstantSymbol
 from callgraph.nodes import make_node
 from callgraph.indent_printer import IndentPrinter, NonePrinter, dump_tree
 
@@ -21,7 +22,7 @@ from callgraph.indent_printer import IndentPrinter, NonePrinter, dump_tree
 # TODO(burlog): process signature? are defs invoked during import?
 # TODO(burlog): tests for global variables
 # TODO(burlog): __getattr__, __getattribute__ overrides will be problem
-# TODO(burlog): make result of list, tuple, dict, ... iterable
+# TODO(burlog): make result of list(), tuple(), dict(), ... iterable
 
 class CallGraphBuilder(object):
     def __init__(self, global_variables={}, silent=False):
@@ -80,36 +81,52 @@ class CallGraphBuilder(object):
 
     def inject_arguments(self, printer, node, args, kwargs):
         sig = signature(node.symbol.value)
-        self.inject_self(printer, node, sig, args)
-        bound = sig.bind_partial(*args, **dict(self.iter_kwargs(sig, kwargs)))
+        self.inject_self(printer, node, sig, args, kwargs)
+        bound = sig.bind_partial(*args, **self.polish_kwargs(sig, kwargs))
         self.inject_defaults(printer, node, sig, bound)
         for name, value in bound.arguments.items():
-            printer("% Binding argument:", name + "=" + str(value))
-            node.symbol.set(name, value)
+            value_symbol = self.as_symbol(value)
+            printer("% Binding argument:", name + "=" + str(value_symbol))
+            node.symbol.set(name, value_symbol)
+
+    def polish_kwargs(self, sig, kwargs):
+        for param in sig.parameters.values():
+            if param.kind == param.VAR_KEYWORD:
+                return kwargs
+        return dict(self.iter_kwargs(sig, kwargs))
 
     def iter_kwargs(self, sig, kwargs):
-        # TODO(burlog): fix starargs, kwstarargs
         for param in sig.parameters.values():
             if param.kind == param.POSITIONAL_OR_KEYWORD:
                 if param.name in kwargs:
                     yield param.name, kwargs[param.name]
 
-    def inject_self(self, printer, node, sig, args):
+    def inject_self(self, printer, node, sig, args, kwargs):
         if node.symbol.myself and sig.parameters:
-            # TODO(burlog): better bound mehtod detection
+            # TODO(burlog): better bound method detection
             if next(iter(sig.parameters.keys())) == "self":
                 args.insert(0, node.symbol.myself)
             else:
-                print("!!! Early out due to *args including self")
-                return # TODO(burlog): starargs self implementation
+                # TODO(burlog): improve detection logic
+                kwargs["self"] = node.symbol.myself
 
     def inject_defaults(self, printer, node, sig, bound):
-        ## TODO(burlog): default args
-        #for param in sig.parameters.values():
-        #    if param.name not in bound.arguments
-        #         if param.default is not param.empty:
-        #             pass #ba.arguments[param.name] = param.default
-        pass
+        for param in sig.parameters.values():
+            if param.name not in bound.arguments:
+                 if param.default is not param.empty:
+                     symbol = UnarySymbol(self, param.name, param.default)
+                     bound.arguments[param.name] = symbol
+
+    def as_symbol(self, value):
+        if isinstance(value, Symbol):
+            return value
+        elif isinstance(value, (tuple, list)):
+            return IterableConstantSymbol(self, tuple, value)
+        elif isinstance(value, dict):
+            values = list(value.values())
+            keys = list(UnarySymbol(self, "str", k) for k in value.keys())
+            return MappingConstantSymbol(self, dict, keys, values)
+        raise RuntimeError("Can't convert value to symbol: " + str(value))
 
 # dogfooding build function
 if __name__ == "__main__":
